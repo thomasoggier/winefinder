@@ -3,7 +3,7 @@ import { LoaderFunction } from "@remix-run/node";
 
 export let loader: LoaderFunction = async ({ request }) => {
   return await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
+    failureRedirect: "/welldone",
   });
 };
 export default function testPage() {
