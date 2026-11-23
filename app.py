@@ -1,6 +1,7 @@
 import io
 import os
 import random
+import shutil
 import string
 import sqlite3
 from datetime import datetime, timedelta
@@ -25,7 +26,9 @@ app.secret_key = 'cle_secrete_degustation_vin_2026'
 app.permanent_session_lifetime = timedelta(hours=24)
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
+DB_ARCHIVE_FOLDER = os.path.join(BASE_DIR, 'static', 'db')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(DB_ARCHIVE_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 DB_NAME = os.path.join(BASE_DIR, 'vin.db')
 
@@ -99,6 +102,38 @@ def init_db():
         if 'results_reveal' not in state_cols:
             conn.execute("ALTER TABLE game_state ADD COLUMN results_reveal TEXT DEFAULT 'all'")
         conn.commit()
+
+def archive_and_reset_database():
+    os.makedirs(DB_ARCHIVE_FOLDER, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archived_path = os.path.join(DB_ARCHIVE_FOLDER, f"vin_{timestamp}.db")
+
+    if os.path.exists(DB_NAME):
+        src_conn = sqlite3.connect(DB_NAME, timeout=10)
+        dst_conn = sqlite3.connect(archived_path)
+        try:
+            src_conn.backup(dst_conn)
+        finally:
+            dst_conn.close()
+            src_conn.close()
+
+    conn = sqlite3.connect(DB_NAME, timeout=10)
+    try:
+        conn.executescript('''
+            PRAGMA foreign_keys = OFF;
+            DROP TABLE IF EXISTS votes;
+            DROP TABLE IF EXISTS notes;
+            DROP TABLE IF EXISTS wines;
+            DROP TABLE IF EXISTS game_state;
+            DROP TABLE IF EXISTS users;
+            PRAGMA foreign_keys = ON;
+        ''')
+        conn.commit()
+    finally:
+        conn.close()
+
+    init_db()
+    return archived_path
 
 
 def are_wines_in_carafes(wines):
@@ -195,18 +230,32 @@ def compute_results_data(db, uid=None):
     for u in users:
         score = 0
         weighted_score = 0.0
+        best_single_weight = 0.0
+        best_single_wine_name = None
+
         for w in wines:
             c_num = w['carafe_number']
             if votes_lookup.get((u['id'], c_num)) == w['id']:
                 score += 1
-                weighted_score += weight_by_carafe[c_num]
+                w_pts = weight_by_carafe[c_num]
+                weighted_score += w_pts
+                if w_pts > best_single_weight:
+                    best_single_weight = w_pts
+                    best_single_wine_name = w['name']
+
+        user_ratings = [n['rating'] for n in notes if n['user_id'] == u['id'] and n['rating'] is not None]
+        avg_given_rating = round(sum(user_ratings) / len(user_ratings), 1) if user_ratings else None
+
         leaderboard.append({
             'user_id': u['id'],
             'username': u['username'],
             'score': score,
             'weighted_score': round(weighted_score, 2),
             'total': total_wines,
-            'is_me': (uid is not None and u['id'] == uid)
+            'is_me': (uid is not None and u['id'] == uid),
+            'best_single_weight': best_single_weight,
+            'best_single_wine_name': best_single_wine_name,
+            'avg_given_rating': avg_given_rating
         })
 
     leaderboard.sort(key=lambda x: (-x['score'], -x['weighted_score'], x['username'].lower()))
@@ -280,6 +329,31 @@ def compute_results_data(db, uid=None):
     hardest_wine = min(wine_stats, key=lambda x: (x['correct_count'], -x['carafe_number'])) if wine_stats else None
     easiest_wine = max(wine_stats, key=lambda x: (x['correct_count'], -x['carafe_number'])) if wine_stats else None
 
+    # Statistiques amusantes
+    poker_candidates = [p for p in leaderboard if p['best_single_weight'] > 0]
+    poker_winner = max(
+        poker_candidates,
+        key=lambda x: (x['best_single_weight'], x['weighted_score'])
+    ) if poker_candidates else None
+
+    raters = [p for p in leaderboard if p['avg_given_rating'] is not None]
+    most_generous = max(raters, key=lambda x: x['avg_given_rating']) if raters else None
+    most_strict = min(raters, key=lambda x: x['avg_given_rating']) if raters else None
+
+    rated_wines = [ws for ws in wine_stats if ws['avg_rating'] is not None]
+    # Grand écart : note élevée mais faible réussite
+    surprise_trap = max(
+        rated_wines,
+        key=lambda x: (x['avg_rating'] - (x['success_rate'] / 10.0))
+    ) if rated_wines else None
+
+    fun_stats = {
+        'poker_winner': poker_winner,
+        'most_generous': most_generous,
+        'most_strict': most_strict,
+        'surprise_trap': surprise_trap
+    }
+
     total_possible_votes = total_players * total_wines
     total_correct_votes = sum(x['correct_count'] for x in wine_stats)
     global_success_rate = round((total_correct_votes / total_possible_votes) * 100) if total_possible_votes > 0 else 0
@@ -291,7 +365,8 @@ def compute_results_data(db, uid=None):
         'total_correct_votes': total_correct_votes,
         'total_possible_votes': total_possible_votes,
         'hardest_wine': hardest_wine,
-        'easiest_wine': easiest_wine
+        'easiest_wine': easiest_wine,
+        'fun_stats': fun_stats
     }
 
     return wines, leaderboard, carafe_details, wine_stats, stats, my_notes_review
@@ -784,7 +859,7 @@ def voting():
     expected_wine_ids = {w['id'] for w in wines if w['carafe_number'] is not None}
     is_vote_validated, _ = inspect_user_votes(user_row, user_votes_rows, expected_carafes, expected_wine_ids)
 
-    pending_voters, expected_votes_count = get_pending_voters(db)
+    pending_voters, _ = get_pending_voters(db)
     all_users = db.execute('SELECT id FROM users').fetchall()
     total_players = len(all_users)
     validated_players_count = max(0, total_players - len(pending_voters))
@@ -1076,6 +1151,16 @@ def admin():
                 else:
                     flash("Tous les votes sont validés ! Le classement complet (Top 3 inclus) est révélé.", "success")
 
+        elif action == 'finish_game':
+            db.close()
+            archived_path = archive_and_reset_database()
+            session.clear()
+            flash(
+                f"Partie terminée ! Base sauvegardée dans {os.path.relpath(archived_path, BASE_DIR)} et nouvelle base vide créée.",
+                "success"
+            )
+            return redirect(url_for('login'))
+
         elif action == 'reset_game':
             db.execute("DELETE FROM votes")
             db.execute("DELETE FROM notes")
@@ -1136,6 +1221,13 @@ def admin():
     can_reveal_results = carafes_ready and all_votes_validated
     can_export_pdf = (state['phase'] == 'RESULTS' and (state['results_reveal'] or 'all') == 'all')
 
+    archived_dbs = []
+    if os.path.isdir(DB_ARCHIVE_FOLDER):
+        archived_dbs = sorted(
+            [f for f in os.listdir(DB_ARCHIVE_FOLDER) if f.endswith('.db')],
+            reverse=True
+        )
+
     return render_template(
         'admin.html',
         state=state,
@@ -1152,36 +1244,10 @@ def admin():
         can_force_voting=can_force_voting,
         all_votes_validated=all_votes_validated,
         can_reveal_results=can_reveal_results,
-        can_export_pdf=can_export_pdf
+        can_export_pdf=can_export_pdf,
+        archived_dbs=archived_dbs
     )
 
-@app.route('/admin/db')
-@login_required
-@admin_required
-def admin_db_view():
-    db = get_db()
-    table_rows = db.execute(
-        "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-    ).fetchall()
-
-    tables = []
-    for t in table_rows:
-        t_name = t['name']
-        cols = [c['name'] for c in db.execute(f"PRAGMA table_info({t_name})").fetchall()]
-        rows = [dict(r) for r in db.execute(f"SELECT * FROM {t_name}").fetchall()]
-        # Masquer le hash du mot de passe si souhaité
-        if t_name == 'users' and 'password' in cols:
-            cols = [c for c in cols if c != 'password']
-            for r in rows:
-                r.pop('password', None)
-        tables.append({
-            'name': t_name,
-            'sql': t['sql'],
-            'cols': cols,
-            'rows': rows
-        })
-
-    return render_template('admin_db.html', tables=tables)
 
 if __name__ == '__main__':
     init_db()
