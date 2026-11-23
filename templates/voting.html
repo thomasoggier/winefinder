@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  option.assigned-wine-option {
+    color: #78716c;
+    text-decoration: line-through;
+    font-style: italic;
+  }
+</style>
+
+<div class="mb-5">
+  <h1 class="text-2xl font-bold text-rose-950">🕵️ Vote à l'aveugle</h1>
+  <p class="text-xs text-stone-500 mt-1">
+    Associez chaque vin dégusté à une carafe numérotée ({{ carafes|length }} carafes). Relisez vos notes ci-dessous si
+    besoin.
+  </p>
+</div>
+
+{% if validation_errors %}
+<div class="bg-red-50 border-2 border-red-400 text-red-900 p-4 rounded-2xl shadow-sm mb-6">
+  <div class="flex items-center gap-2 font-extrabold text-sm text-red-800 mb-2">
+    <span>⛔</span>
+    <span>Validation impossible — {{ validation_errors|length }} erreur{{ 's' if validation_errors|length > 1 else '' }}
+      détectée{{ 's' if validation_errors|length > 1 else '' }} :</span>
+  </div>
+  <ul class="list-disc pl-5 space-y-1 text-xs font-semibold text-red-900">
+    {% for err in validation_errors %}
+    <li>{{ err }}</li>
+    {% endfor %}
+  </ul>
+  <p class="text-[11px] text-red-700 mt-2.5">
+    Vos sélections n'ont pas été effacées : corrigez les éléments encadrés en rouge puis cliquez à nouveau sur
+    <b>Valider mes votes</b>.
+  </p>
+</div>
+{% endif %}
+
+<form method="POST" id="voting-form" novalidate class="space-y-4">
+  {% for card in cards %}
+  {% set w = card['wine'] %}
+  {% set n = card['note'] %}
+  {% set assigned = card['assigned_carafe'] %}
+  <div
+    class="bg-white rounded-2xl shadow-sm p-4 transition {{ 'border-2 border-red-500 bg-red-50/20' if card['has_error'] else 'border border-stone-200' }}">
+    <div class="flex items-start justify-between gap-3 mb-3">
+      <div class="min-w-0">
+        <h2 class="font-bold text-base text-rose-950 truncate">{{ w['name'] }}</h2>
+        <p class="text-xs text-stone-500">{{ w['region'] or 'Région non précisée' }} {{ '• ' + w['year'] if w['year'] }}
+        </p>
+      </div>
+      {% if card['is_duplicate_carafe'] %}
+      <span
+        class="bg-red-100 text-red-800 border border-red-300 text-[11px] font-extrabold px-2.5 py-1 rounded-full shrink-0">
+        Doublon Carafe N°{{ assigned }}
+      </span>
+      {% elif card['is_missing'] %}
+      <span
+        class="bg-red-100 text-red-800 border border-red-300 text-[11px] font-extrabold px-2.5 py-1 rounded-full shrink-0">
+        Non assigné
+      </span>
+      {% elif assigned %}
+      <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-full shrink-0">
+        Carafe N°{{ assigned }}
+      </span>
+      {% endif %}
+    </div>
+
+    <!-- Rappel des notes personnelles -->
+    {% if n.get('rating') or n.get('color') or n.get('nose') or n.get('palate') or n.get('free_notes') %}
+    <div class="bg-stone-50 rounded-xl p-3 mb-3 border border-stone-100 text-xs text-stone-700 space-y-1">
+      {% if n.get('rating') %}
+      <div class="font-bold text-amber-900">⭐ Votre note : {{ n.get('rating') }}/10</div>
+      {% endif %}
+      {% if n.get('color') or n.get('nose') or n.get('palate') %}
+      <p><span class="font-semibold text-stone-500">👁️ Robe :</span> {{ n.get('color') or '-' }} • <span
+          class="font-semibold text-stone-500">👃 Nez :</span> {{ n.get('nose') or '-' }}</p>
+      <p><span class="font-semibold text-stone-500">👅 Bouche :</span> {{ n.get('palate') or '-' }}</p>
+      {% endif %}
+      {% if n.get('free_notes') %}
+      <p class="whitespace-pre-line text-stone-800"><span class="font-semibold text-stone-500">✍️ Note libre :</span> {{
+        n.get('free_notes') }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div>
+      <label for="wine_{{ w['id'] }}"
+        class="block text-xs font-bold uppercase tracking-wider mb-1.5 {{ 'text-red-700' if card['has_error'] else 'text-stone-500' }}">
+        Carafe correspondante
+      </label>
+      <select id="wine_{{ w['id'] }}" name="wine_{{ w['id'] }}" data-wine-id="{{ w['id'] }}"
+        data-wine-name="{{ w['name'] }}"
+        class="carafe-select w-full rounded-xl px-3 py-2.5 font-bold text-sm {{ 'border-2 border-red-500 bg-red-50 text-red-950' if card['has_error'] else 'border border-stone-300 bg-stone-50 text-rose-950 focus:bg-white' }}">
+        <option value="">-- Choisir une carafe --</option>
+        {% for c in carafes %}
+        <option value="{{ c }}" data-carafe-num="{{ c }}" {% if assigned==c %}selected{% endif %}>Carafe N°{{ c }}
+        </option>
+        {% endfor %}
+      </select>
+      {% if card['is_duplicate_carafe'] %}
+      <p class="text-xs font-bold text-red-700 mt-1.5">
+        ⚠️ La Carafe N°{{ assigned }} est choisie plusieurs fois.
+      </p>
+      {% elif card['is_missing'] %}
+      <p class="text-xs font-bold text-red-700 mt-1.5">
+        ⚠️ Veuillez sélectionner une carafe pour ce vin.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <button type="submit"
+    class="w-full bg-rose-900 hover:bg-rose-950 text-white py-3.5 rounded-2xl font-extrabold text-base shadow-md active:scale-95 transition">
+    ✓ Valider mes votes
+  </button>
+</form>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const selects = Array.from(document.querySelectorAll('.carafe-select'));
+
+    function refreshAssignedLabels() {
+      const carafeOwners = {};
+      selects.forEach(function (sel) {
+        const val = sel.value;
+        if (val) {
+          const wineName = sel.getAttribute('data-wine-name') || 'Vin';
+          if (!carafeOwners[val]) {
+            carafeOwners[val] = [];
+          }
+          carafeOwners[val].push(wineName);
+        }
+      });
+
+      selects.forEach(function (currentSel) {
+        const currentVal = currentSel.value;
+        const currentWineName = currentSel.getAttribute('data-wine-name') || 'Vin';
+        const options = currentSel.querySelectorAll('option[data-carafe-num]');
+
+        options.forEach(function (opt) {
+          const cNum = opt.getAttribute('data-carafe-num');
+          const owners = carafeOwners[cNum] || [];
+          const otherOwners = owners.filter(function (name) {
+            return !(opt.value === currentVal && name === currentWineName);
+          });
+
+          if (otherOwners.length > 0) {
+            opt.textContent = `Carafe N°${cNum} — ${otherOwners.join(', ')} (déjà assigné)`;
+            opt.classList.add('assigned-wine-option');
+          } else {
+            opt.textContent = `Carafe N°${cNum}`;
+            opt.classList.remove('assigned-wine-option');
+          }
+        });
+      });
+    }
+
+    refreshAssignedLabels();
+
+    selects.forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        refreshAssignedLabels();
+        const wineId = sel.getAttribute('data-wine-id');
+        const carafeVal = sel.value || null;
+        fetch('/api/save_vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wine_id: wineId, carafe: carafeVal })
+        }).catch(function () { });
+      });
+    });
+  });
+</script>
+{% endblock %}

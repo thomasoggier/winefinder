@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-rose-950">⚙️ Administration</h1>
+  <p class="text-xs text-stone-500">Phase actuelle : <span class="font-bold text-rose-900">{{ phase }}</span></p>
+</div>
+
+<!-- 1. Ajouter une bouteille -->
+<div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
+  <h2 class="font-bold text-base text-rose-950 mb-3">🍷 Ajouter une bouteille</h2>
+  <form method="POST" enctype="multipart/form-data" class="space-y-3">
+    <input type="hidden" name="action" value="add_wine">
+    <div>
+      <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Nom du vin *</label>
+      <input type="text" name="name" required placeholder="Ex : Château Margaux, Cornas..."
+        class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Millésime</label>
+        <input type="text" name="year" placeholder="2018"
+          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
+      </div>
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Région / Cépage</label>
+        <input type="text" name="region" placeholder="Bordeaux, Syrah..."
+          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Photo de l'étiquette /
+        bouteille</label>
+      <input type="file" name="photo" accept="image/*"
+        class="w-full text-xs text-stone-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-rose-950 file:text-white">
+    </div>
+    <button type="submit"
+      class="w-full bg-rose-900 text-white py-3 rounded-xl font-bold text-sm shadow-sm active:scale-95 transition">
+      + Ajouter la bouteille
+    </button>
+  </form>
+</div>
+
+<!-- Liste des bouteilles -->
+<div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
+  <h2 class="font-bold text-base text-rose-950 mb-3">📋 Bouteilles enregistrées ({{ wines|length }})</h2>
+  {% if wines %}
+  <div class="space-y-2.5">
+    {% for w in wines %}
+    <div class="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-stone-50 border border-stone-100">
+      <div class="flex items-center gap-3 min-w-0">
+        {% if w['image_path'] %}
+        <img src="{{ url_for('static', filename=w['image_path']) }}" alt="{{ w['name'] }}"
+          class="w-11 h-11 rounded-lg object-cover bg-stone-900 shrink-0">
+        {% else %}
+        <div class="w-11 h-11 rounded-lg bg-rose-950/10 text-rose-950 flex items-center justify-center shrink-0">🍷
+        </div>
+        {% endif %}
+        <div class="min-w-0">
+          <div class="font-bold text-sm text-rose-950 truncate">{{ w['name'] }}</div>
+          <div class="text-xs text-stone-500 truncate">{{ w['region'] or '-' }} {{ '• ' + w['year'] if w['year'] }}
+          </div>
+        </div>
+      </div>
+      <form method="POST" onsubmit="return confirm('Supprimer cette bouteille ?');">
+        <input type="hidden" name="action" value="delete_wine">
+        <input type="hidden" name="wine_id" value="{{ w['id'] }}">
+        <button type="submit"
+          class="text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg">
+          Supprimer
+        </button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-xs text-stone-400 italic">Aucune bouteille ajoutée pour le moment.</p>
+  {% endif %}
+</div>
+
+<!-- 2. Désigner Personne A et Personne B -->
+<div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
+  <h2 class="font-bold text-base text-rose-950 mb-1">🎭 Rôles mise en carafe à l'aveugle</h2>
+  <p class="text-xs text-stone-500 mb-3">Personne A remplit les carafes ; Personne B mélange et numérote de 1 à N.</p>
+  <form method="POST" class="space-y-3">
+    <input type="hidden" name="action" value="assign_roles">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Personne A
+          (Remplissage)</label>
+        <select name="person_a_id"
+          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 font-semibold">
+          <option value="">-- Choisir --</option>
+          {% for u in users %}
+          <option value="{{ u['id'] }}" {% if state['person_a_id']==u['id'] %}selected{% endif %}>{{ u['username'] }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Personne B
+          (Numérotation)</label>
+        <select name="person_b_id"
+          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 font-semibold">
+          <option value="">-- Choisir --</option>
+          {% for u in users %}
+          <option value="{{ u['id'] }}" {% if state['person_b_id']==u['id'] %}selected{% endif %}>{{ u['username'] }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <button type="submit"
+      class="w-full bg-stone-800 text-white py-2.5 rounded-xl font-bold text-sm active:scale-95 transition">
+      Enregistrer les rôles A & B
+    </button>
+  </form>
+</div>
+
+<!-- 3. Pilotage des phases & révélation progressive des résultats -->
+<div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6 space-y-3">
+  <h2 class="font-bold text-base text-rose-950 mb-1">🎬 Pilotage de la soirée</h2>
+
+  <form method="POST">
+    <input type="hidden" name="action" value="start_blind_step1">
+    <button type="submit"
+      class="w-full bg-amber-600 text-white py-3 rounded-xl font-bold text-sm shadow-sm active:scale-95 transition">
+      🫙 Lancer la mise en carafe (Étape 1 : Personne A)
+    </button>
+  </form>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+    <form method="POST">
+      <input type="hidden" name="action" value="force_step2">
+      <button type="submit"
+        class="w-full bg-stone-200 text-stone-800 py-2.5 px-3 rounded-xl font-bold text-xs active:scale-95 transition">
+        Passer à l'Étape 2 (Personne B)
+      </button>
+    </form>
+    <form method="POST">
+      <input type="hidden" name="action" value="force_voting">
+      <button type="submit"
+        class="w-full bg-rose-900 hover:bg-rose-950 text-white py-2.5 px-3 rounded-xl font-extrabold text-xs shadow-sm active:scale-95 transition">
+        🗳️ Revenir en mode vote (VOTING)
+      </button>
+    </form>
+  </div>
+
+  <div class="pt-3 border-t border-stone-100 space-y-2.5">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <span class="text-xs font-bold uppercase tracking-wider text-stone-500">🏆 Révélation des résultats</span>
+      {% if not all_votes_validated %}
+      <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-red-100 text-red-700">
+        🔒 Votes incomplets chez au moins un joueur
+      </span>
+      {% elif phase == 'RESULTS' %}
+      <span
+        class="text-[11px] font-bold px-2.5 py-0.5 rounded-full {{ 'bg-amber-100 text-amber-900' if results_reveal == 'bottom_to_top_3' else 'bg-emerald-100 text-emerald-800' }}">
+        {{ 'Suspense : Top 3 masqué' if results_reveal == 'bottom_to_top_3' else 'Classement complet visible' }}
+      </span>
+      {% else %}
+      <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+        ✓ Tous les votes sont validés
+      </span>
+      {% endif %}
+    </div>
+
+    {% if not all_votes_validated %}
+    <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5">
+      Chaque participant doit avoir assigné et validé tous les vins / carafes avant de pouvoir afficher les résultats.
+      Vous pouvez dévalider un joueur ci-dessous pour le renvoyer en mode vote.
+    </p>
+    {% endif %}
+
+    <form method="POST">
+      <input type="hidden" name="action" value="reveal_bottom_to_top3">
+      <button type="submit" {% if not all_votes_validated %}disabled{% endif %}
+        class="w-full py-3 px-4 rounded-xl font-extrabold text-sm shadow-sm transition {{ 'bg-amber-500 hover:bg-amber-600 text-rose-950 active:scale-95' if all_votes_validated else 'bg-stone-200 text-stone-400 cursor-not-allowed' }}">
+        🎭 Révéler des derniers jusqu'au 4e (garder le Top 3 secret)
+      </button>
+    </form>
+
+    <form method="POST">
+      <input type="hidden" name="action" value="reveal_top_3">
+      <button type="submit" {% if not all_votes_validated %}disabled{% endif %}
+        class="w-full py-3 px-4 rounded-xl font-extrabold text-sm shadow-sm transition {{ 'bg-emerald-700 hover:bg-emerald-800 text-white active:scale-95' if all_votes_validated else 'bg-stone-200 text-stone-400 cursor-not-allowed' }}">
+        🥇 Révéler les 3 premiers (classement complet)
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Progression des joueurs -->
+<div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
+  <h2 class="font-bold text-base text-rose-950 mb-3">👥 Progression des joueurs</h2>
+  <div class="space-y-2 text-sm">
+    {% for p in progress %}
+    <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-stone-50 border border-stone-100 flex-wrap">
+      <span class="font-bold text-stone-800">{{ p['username'] }}</span>
+      <div class="flex items-center gap-2 text-xs text-stone-600 flex-wrap">
+        <span>Notes : <b>{{ p['notes_done'] }}/{{ p['total_wines'] }}</b></span>
+        <span>•</span>
+        <span>Votes : <b>{{ p['votes_done'] }}/{{ p['expected_votes'] }}</b></span>
+        {% if p['votes_validated'] %}
+        <span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">✓ Validé</span>
+        {% else %}
+        <span class="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full">En attente</span>
+        {% endif %}
+        <form method="POST" class="inline unvalidate-form" data-username="{{ p['username'] }}">
+          <input type="hidden" name="action" value="unvalidate_user_votes">
+          <input type="hidden" name="user_id" value="{{ p['user_id'] }}">
+          <button type="submit"
+            class="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold px-2 py-0.5 rounded-lg transition">
+            ↩ Dévalider
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Réinitialisation -->
+<div class="bg-white p-4 rounded-2xl shadow-sm border border-red-200">
+  <h2 class="font-bold text-sm text-red-800 mb-2">⚠️ Zone dangereuse</h2>
+  <form method="POST" onsubmit="return confirm('Réinitialiser toute la partie (vins, notes, votes) ?');">
+    <input type="hidden" name="action" value="reset_game">
+    <button type="submit"
+      class="w-full bg-red-50 text-red-700 border border-red-200 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition">
+      Réinitialiser la partie
+    </button>
+  </form>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.unvalidate-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        const name = form.getAttribute('data-username') || 'ce joueur';
+        if (!confirm('Dévalider les votes de ' + name + ' et revenir en mode vote ?')) {
+          e.preventDefault();
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}
