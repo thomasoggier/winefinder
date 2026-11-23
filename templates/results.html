@@ -6,6 +6,15 @@
   <p class="text-xs text-stone-500 mt-1">
     En cas d'égalité, les carafes les moins trouvées rapportent plus de points pondérés.
   </p>
+  {% if not top_3_hidden %}
+  <div class="mt-3">
+    <a href="{{ url_for('export_results_pdf') }}"
+      class="inline-flex items-center gap-2 bg-rose-950 hover:bg-rose-900 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm active:scale-95 transition">
+      <span>📄</span>
+      <span>Exporter les résultats globaux en PDF</span>
+    </a>
+  </div>
+  {% endif %}
 </div>
 
 {% if top_3_hidden %}
@@ -392,6 +401,14 @@
     </div>
   </div>
   {% endfor %}
+</div>
+
+<div class="mt-8 text-center">
+  <a href="{{ url_for('export_results_pdf') }}"
+    class="inline-flex items-center gap-2 bg-rose-950 hover:bg-rose-900 text-white text-sm font-extrabold px-5 py-3 rounded-2xl shadow-md active:scale-95 transition">
+    <span>📄</span>
+    <span>Télécharger le récapitulatif complet (PDF)</span>
+  </a>
 </div>
 {% endif %}
 {% endblock %}

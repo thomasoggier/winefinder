@@ -7,34 +7,43 @@
 
 <!-- 1. Ajouter une bouteille -->
 <div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
-  <h2 class="font-bold text-base text-rose-950 mb-3">🍷 Ajouter une bouteille</h2>
+  <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+    <h2 class="font-bold text-base text-rose-950">🍷 Ajouter une bouteille</h2>
+    {% if not can_add_wine %}
+    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-stone-200 text-stone-600">
+      🔒 Verrouillé (votes en cours)
+    </span>
+    {% endif %}
+  </div>
+
   <form method="POST" enctype="multipart/form-data" class="space-y-3">
     <input type="hidden" name="action" value="add_wine">
     <div>
       <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Nom du vin *</label>
-      <input type="text" name="name" required placeholder="Ex : Château Margaux, Cornas..."
-        class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
+      <input type="text" name="name" required {% if not can_add_wine %}disabled{% endif %}
+        placeholder="Ex : Château Margaux, Cornas..."
+        class="w-full border border-stone-300 rounded-xl px-3 py-2.5 {{ 'bg-stone-50 focus:bg-white' if can_add_wine else 'bg-stone-100 text-stone-400 cursor-not-allowed' }}">
     </div>
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Millésime</label>
-        <input type="text" name="year" placeholder="2018"
-          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
+        <input type="text" name="year" {% if not can_add_wine %}disabled{% endif %} placeholder="2018"
+          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 {{ 'bg-stone-50 focus:bg-white' if can_add_wine else 'bg-stone-100 text-stone-400 cursor-not-allowed' }}">
       </div>
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Région / Cépage</label>
-        <input type="text" name="region" placeholder="Bordeaux, Syrah..."
-          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
+        <input type="text" name="region" {% if not can_add_wine %}disabled{% endif %} placeholder="Bordeaux, Syrah..."
+          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 {{ 'bg-stone-50 focus:bg-white' if can_add_wine else 'bg-stone-100 text-stone-400 cursor-not-allowed' }}">
       </div>
     </div>
     <div>
       <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Photo de l'étiquette /
         bouteille</label>
-      <input type="file" name="photo" accept="image/*"
-        class="w-full text-xs text-stone-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-rose-950 file:text-white">
+      <input type="file" name="photo" accept="image/*" {% if not can_add_wine %}disabled{% endif %}
+        class="w-full text-xs text-stone-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold {{ 'file:bg-rose-950 file:text-white' if can_add_wine else 'file:bg-stone-200 file:text-stone-400 cursor-not-allowed' }}">
     </div>
-    <button type="submit"
-      class="w-full bg-rose-900 text-white py-3 rounded-xl font-bold text-sm shadow-sm active:scale-95 transition">
+    <button type="submit" {% if not can_add_wine %}disabled{% endif %}
+      class="w-full py-3 rounded-xl font-bold text-sm shadow-sm transition {{ 'bg-rose-900 hover:bg-rose-950 text-white active:scale-95' if can_add_wine else 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none' }}">
       + Ajouter la bouteille
     </button>
   </form>
@@ -57,7 +66,10 @@
         {% endif %}
         <div class="min-w-0">
           <div class="font-bold text-sm text-rose-950 truncate">{{ w['name'] }}</div>
-          <div class="text-xs text-stone-500 truncate">{{ w['region'] or '-' }} {{ '• ' + w['year'] if w['year'] }}
+          <div class="text-xs text-stone-500 truncate">
+            {{ w['region'] or '-' }} {{ '• ' + w['year'] if w['year'] }}
+            {% if w['carafe_number'] %} • <span class="font-bold text-rose-900">Carafe N°{{ w['carafe_number']
+              }}</span>{% endif %}
           </div>
         </div>
       </div>
@@ -122,8 +134,8 @@
 
   <form method="POST">
     <input type="hidden" name="action" value="start_blind_step1">
-    <button type="submit"
-      class="w-full bg-amber-600 text-white py-3 rounded-xl font-bold text-sm shadow-sm active:scale-95 transition">
+    <button type="submit" {% if not can_start_step1 %}disabled{% endif %}
+      class="w-full py-3 rounded-xl font-bold text-sm shadow-sm transition {{ 'bg-amber-600 hover:bg-amber-700 text-white active:scale-95' if can_start_step1 else 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none' }}">
       🫙 Lancer la mise en carafe (Étape 1 : Personne A)
     </button>
   </form>
@@ -131,24 +143,34 @@
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
     <form method="POST">
       <input type="hidden" name="action" value="force_step2">
-      <button type="submit"
-        class="w-full bg-stone-200 text-stone-800 py-2.5 px-3 rounded-xl font-bold text-xs active:scale-95 transition">
+      <button type="submit" {% if not can_force_step2 %}disabled{% endif %}
+        class="w-full py-2.5 px-3 rounded-xl font-bold text-xs transition {{ 'bg-stone-200 hover:bg-stone-300 text-stone-800 active:scale-95' if can_force_step2 else 'bg-stone-100 text-stone-400 cursor-not-allowed' }}">
         Passer à l'Étape 2 (Personne B)
       </button>
     </form>
     <form method="POST">
       <input type="hidden" name="action" value="force_voting">
-      <button type="submit"
-        class="w-full bg-rose-900 hover:bg-rose-950 text-white py-2.5 px-3 rounded-xl font-extrabold text-xs shadow-sm active:scale-95 transition">
+      <button type="submit" {% if not can_force_voting %}disabled{% endif %}
+        class="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs shadow-sm transition {{ 'bg-rose-900 hover:bg-rose-950 text-white active:scale-95' if can_force_voting else 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none' }}">
         🗳️ Revenir en mode vote (VOTING)
       </button>
     </form>
   </div>
 
+  {% if not carafes_ready %}
+  <p class="text-[11px] text-stone-500">
+    💡 Le mode vote est grisé tant que les vins n'ont pas tous été mis en carafe (Étape 1 / Étape 2).
+  </p>
+  {% endif %}
+
   <div class="pt-3 border-t border-stone-100 space-y-2.5">
     <div class="flex items-center justify-between gap-2 flex-wrap">
       <span class="text-xs font-bold uppercase tracking-wider text-stone-500">🏆 Révélation des résultats</span>
-      {% if not all_votes_validated %}
+      {% if not carafes_ready %}
+      <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600">
+        🔒 Carafes non prêtes
+      </span>
+      {% elif not all_votes_validated %}
       <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-red-100 text-red-700">
         🔒 Votes incomplets chez au moins un joueur
       </span>
@@ -173,29 +195,46 @@
 
     <form method="POST">
       <input type="hidden" name="action" value="reveal_bottom_to_top3">
-      <button type="submit" {% if not all_votes_validated %}disabled{% endif %}
-        class="w-full py-3 px-4 rounded-xl font-extrabold text-sm shadow-sm transition {{ 'bg-amber-500 hover:bg-amber-600 text-rose-950 active:scale-95' if all_votes_validated else 'bg-stone-200 text-stone-400 cursor-not-allowed' }}">
+      <button type="submit" {% if not can_reveal_results %}disabled{% endif %}
+        class="w-full py-3 px-4 rounded-xl font-extrabold text-sm shadow-sm transition {{ 'bg-amber-500 hover:bg-amber-600 text-rose-950 active:scale-95' if can_reveal_results else 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none' }}">
         🎭 Révéler des derniers jusqu'au 4e (garder le Top 3 secret)
       </button>
     </form>
 
     <form method="POST">
       <input type="hidden" name="action" value="reveal_top_3">
-      <button type="submit" {% if not all_votes_validated %}disabled{% endif %}
-        class="w-full py-3 px-4 rounded-xl font-extrabold text-sm shadow-sm transition {{ 'bg-emerald-700 hover:bg-emerald-800 text-white active:scale-95' if all_votes_validated else 'bg-stone-200 text-stone-400 cursor-not-allowed' }}">
+      <button type="submit" {% if not can_reveal_results %}disabled{% endif %}
+        class="w-full py-3 px-4 rounded-xl font-extrabold text-sm shadow-sm transition {{ 'bg-emerald-700 hover:bg-emerald-800 text-white active:scale-95' if can_reveal_results else 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none' }}">
         🥇 Révéler les 3 premiers (classement complet)
       </button>
     </form>
+
+    {% if can_export_pdf %}
+    <a href="{{ url_for('export_results_pdf') }}"
+      class="block text-center w-full py-3 px-4 rounded-xl font-extrabold text-sm bg-rose-950 hover:bg-rose-900 text-white shadow-sm active:scale-95 transition">
+      📄 Exporter les résultats globaux (PDF)
+    </a>
+    {% else %}
+    <button type="button" disabled
+      class="w-full py-3 px-4 rounded-xl font-extrabold text-sm bg-stone-200 text-stone-400 cursor-not-allowed">
+      📄 Exporter les résultats globaux (PDF)
+    </button>
+    {% endif %}
   </div>
 </div>
 
-<!-- Progression des joueurs -->
+<!-- Progression des joueurs & gestion des concurrents -->
 <div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
-  <h2 class="font-bold text-base text-rose-950 mb-3">👥 Progression des joueurs</h2>
+  <h2 class="font-bold text-base text-rose-950 mb-3">👥 Concurrents & progression ({{ progress|length }})</h2>
   <div class="space-y-2 text-sm">
     {% for p in progress %}
     <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-stone-50 border border-stone-100 flex-wrap">
-      <span class="font-bold text-stone-800">{{ p['username'] }}</span>
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-stone-800">{{ p['username'] }}</span>
+        {% if p['is_admin'] %}
+        <span class="bg-rose-950 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Admin</span>
+        {% endif %}
+      </div>
       <div class="flex items-center gap-2 text-xs text-stone-600 flex-wrap">
         <span>Notes : <b>{{ p['notes_done'] }}/{{ p['total_wines'] }}</b></span>
         <span>•</span>
@@ -205,14 +244,26 @@
         {% else %}
         <span class="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full">En attente</span>
         {% endif %}
+
         <form method="POST" class="inline unvalidate-form" data-username="{{ p['username'] }}">
           <input type="hidden" name="action" value="unvalidate_user_votes">
           <input type="hidden" name="user_id" value="{{ p['user_id'] }}">
           <button type="submit"
-            class="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold px-2 py-0.5 rounded-lg transition">
+            class="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold px-2 py-0.5 rounded-lg transition">
             ↩ Dévalider
           </button>
         </form>
+
+        {% if not p['is_current_user'] %}
+        <form method="POST" class="inline delete-user-form" data-username="{{ p['username'] }}">
+          <input type="hidden" name="action" value="delete_user">
+          <input type="hidden" name="user_id" value="{{ p['user_id'] }}">
+          <button type="submit"
+            class="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold px-2 py-0.5 rounded-lg transition">
+            🗑️ Supprimer
+          </button>
+        </form>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
@@ -237,6 +288,15 @@
       form.addEventListener('submit', function (e) {
         const name = form.getAttribute('data-username') || 'ce joueur';
         if (!confirm('Dévalider les votes de ' + name + ' et revenir en mode vote ?')) {
+          e.preventDefault();
+        }
+      });
+    });
+
+    document.querySelectorAll('.delete-user-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        const name = form.getAttribute('data-username') || 'ce concurrent';
+        if (!confirm('Supprimer définitivement le concurrent « ' + name + ' » ainsi que ses notes et votes ?')) {
           e.preventDefault();
         }
       });
