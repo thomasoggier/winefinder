@@ -50,37 +50,95 @@
 </div>
 
 <!-- Liste des bouteilles -->
+<!-- Liste des bouteilles -->
 <div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
   <h2 class="font-bold text-base text-rose-950 mb-3">📋 Bouteilles enregistrées ({{ wines|length }})</h2>
   {% if wines %}
   <div class="space-y-2.5">
     {% for w in wines %}
-    <div class="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-stone-50 border border-stone-100">
-      <div class="flex items-center gap-3 min-w-0">
-        {% if w['image_path'] %}
-        <img src="{{ url_for('static', filename=w['image_path']) }}" alt="{{ w['name'] }}"
-          class="w-11 h-11 rounded-lg object-cover bg-stone-900 shrink-0">
-        {% else %}
-        <div class="w-11 h-11 rounded-lg bg-rose-950/10 text-rose-950 flex items-center justify-center shrink-0">🍷
-        </div>
-        {% endif %}
-        <div class="min-w-0">
-          <div class="font-bold text-sm text-rose-950 truncate">{{ w['name'] }}</div>
-          <div class="text-xs text-stone-500 truncate">
-            {{ w['region'] or '-' }} {{ '• ' + w['year'] if w['year'] }}
-            {% if w['carafe_number'] %} • <span class="font-bold text-rose-900">Carafe N°{{ w['carafe_number']
-              }}</span>{% endif %}
+    <div class="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          {% if w['image_path'] %}
+          <img src="{{ url_for('static', filename=w['image_path']) }}" alt="{{ w['name'] }}"
+            class="w-11 h-11 rounded-lg object-cover bg-stone-900 shrink-0">
+          {% else %}
+          <div class="w-11 h-11 rounded-lg bg-rose-950/10 text-rose-950 flex items-center justify-center shrink-0">🍷
+          </div>
+          {% endif %}
+          <div class="min-w-0">
+            <div class="font-bold text-sm text-rose-950 truncate">{{ w['name'] }}</div>
+            <div class="text-xs text-stone-500 truncate">
+              {{ w['region'] or '-' }} {{ '• ' + w['year'] if w['year'] }}
+              {% if w['carafe_number'] %} • <span class="font-bold text-rose-900">Carafe N°{{ w['carafe_number']
+                }}</span>{% endif %}
+            </div>
           </div>
         </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          {% if can_add_wine %}
+          <button type="button" onclick="toggleEditWine({{ w['id'] }})"
+            class="text-xs font-bold text-stone-700 bg-stone-200/80 hover:bg-stone-300 px-2.5 py-1.5 rounded-lg transition">
+            ✏️ Modifier
+          </button>
+          {% endif %}
+          <form method="POST" onsubmit="return confirm('Supprimer cette bouteille ?');">
+            <input type="hidden" name="action" value="delete_wine">
+            <input type="hidden" name="wine_id" value="{{ w['id'] }}">
+            <button type="submit"
+              class="text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg">
+              Supprimer
+            </button>
+          </form>
+        </div>
       </div>
-      <form method="POST" onsubmit="return confirm('Supprimer cette bouteille ?');">
-        <input type="hidden" name="action" value="delete_wine">
+
+      {% if can_add_wine %}
+      <form id="edit-wine-{{ w['id'] }}" method="POST" enctype="multipart/form-data"
+        class="hidden pt-3 border-t border-stone-200 space-y-2.5 text-xs">
+        <input type="hidden" name="action" value="edit_wine">
         <input type="hidden" name="wine_id" value="{{ w['id'] }}">
-        <button type="submit"
-          class="text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg">
-          Supprimer
-        </button>
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Nom du vin *</label>
+          <input type="text" name="name" value="{{ w['name'] }}" required
+            class="w-full border border-stone-300 rounded-xl px-3 py-2 bg-white">
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Millésime</label>
+            <input type="text" name="year" value="{{ w['year'] or '' }}"
+              class="w-full border border-stone-300 rounded-xl px-3 py-2 bg-white">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Région /
+              Cépage</label>
+            <input type="text" name="region" value="{{ w['region'] or '' }}"
+              class="w-full border border-stone-300 rounded-xl px-3 py-2 bg-white">
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Remplacer la
+            photo</label>
+          <input type="file" name="photo" accept="image/*"
+            class="w-full text-xs text-stone-600 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-rose-950 file:text-white">
+          {% if w['image_path'] %}
+          <label class="inline-flex items-center gap-1.5 mt-2 text-stone-600 cursor-pointer">
+            <input type="checkbox" name="remove_photo" value="1" class="rounded border-stone-300">
+            <span>Supprimer la photo actuelle</span>
+          </label>
+          {% endif %}
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-1">
+          <button type="button" onclick="toggleEditWine({{ w['id'] }})"
+            class="px-3 py-1.5 rounded-lg font-bold text-stone-600 bg-stone-200 hover:bg-stone-300">
+            Annuler
+          </button>
+          <button type="submit" class="px-3.5 py-1.5 rounded-lg font-bold text-white bg-rose-900 hover:bg-rose-950">
+            Enregistrer
+          </button>
+        </div>
       </form>
+      {% endif %}
     </div>
     {% endfor %}
   </div>
@@ -326,5 +384,12 @@
       });
     });
   });
+
+  function toggleEditWine(wineId) {
+      const el = document.getElementById('edit-wine-' + wineId);
+      if (el) {
+        el.classList.toggle('hidden');
+      }
+    }
 </script>
 {% endblock %}

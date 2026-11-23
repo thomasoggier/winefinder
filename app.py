@@ -1027,6 +1027,51 @@ def admin():
                     )
                     db.commit()
                     flash("Bouteille ajoutée à la dégustation !", "success")
+        elif action == 'edit_wine':
+            current_phase = db.execute('SELECT phase FROM game_state WHERE id = 1').fetchone()['phase']
+            if current_phase in ('VOTING', 'RESULTS'):
+                flash("Impossible de modifier une bouteille : les votes ont déjà commencé.", "error")
+            else:
+                wine_id = request.form.get('wine_id')
+                wine_row = db.execute('SELECT * FROM wines WHERE id = ?', (wine_id,)).fetchone()
+                if not wine_row:
+                    flash("Bouteille introuvable.", "error")
+                else:
+                    name = (request.form.get('name') or '').strip()
+                    year = (request.form.get('year') or '').strip()
+                    region = (request.form.get('region') or '').strip()
+                    remove_photo = bool(request.form.get('remove_photo'))
+                    file = request.files.get('photo')
+
+                    if not name:
+                        flash("Le nom du vin est obligatoire.", "error")
+                    else:
+                        image_path = wine_row['image_path']
+
+                        def _delete_old_photo(rel_path):
+                            if rel_path:
+                                full_path = os.path.join(app.static_folder, rel_path)
+                                if os.path.isfile(full_path):
+                                    try:
+                                        os.remove(full_path)
+                                    except OSError:
+                                        pass
+
+                        if file and file.filename:
+                            filename = secure_filename(f"{random.randint(1000,9999)}_{file.filename}")
+                            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                            _delete_old_photo(image_path)
+                            image_path = f"uploads/{filename}"
+                        elif remove_photo:
+                            _delete_old_photo(image_path)
+                            image_path = None
+
+                        db.execute(
+                            'UPDATE wines SET name = ?, year = ?, region = ?, image_path = ? WHERE id = ?',
+                            (name, year, region, image_path, wine_id)
+                        )
+                        db.commit()
+                        flash("Bouteille mise à jour !", "success")
 
         elif action == 'delete_wine':
             wine_id = request.form.get('wine_id')
@@ -1084,7 +1129,7 @@ def admin():
                 flash("Assignez deux joueurs distincts (Personne A et Personne B) avant de lancer l'Étape 1.", "error")
             else:
                 codes = random.sample(
-                    [f"CODE-{''.join(random.choices(string.ascii_uppercase, k=3))}" for _ in range(max(100, len(wines) * 10))],
+                    [f"{''.join(random.choices(string.ascii_uppercase, k=3))}" for _ in range(max(100, len(wines) * 10))],
                     len(wines)
                 )
                 for w, code in zip(wines, codes):
