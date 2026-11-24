@@ -1,0 +1,15 @@
+services:
+  degustation-vin:
+    build: .
+    container_name: degustation-vin
+    ports:
+      - '5050:5050'
+    environment:
+      - FLASK_SECRET_KEY=change_moi_en_production
+      - APP_DATA_DIR=/app/data
+      - DB_NAME=/app/data/vin.db
+      - UPLOAD_FOLDER=/app/data/uploads
+      - DB_ARCHIVE_FOLDER=/app/data/db_archive
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

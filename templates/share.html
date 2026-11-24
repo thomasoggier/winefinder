@@ -313,7 +313,7 @@
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const matrix = buildMatrix(cleanUrl || "http://127.0.0.1:5000");
+      const matrix = buildMatrix(cleanUrl || "http://127.0.0.1:5050");
       if (!matrix) {
         ctx.fillStyle = "#7f1d1d";
         ctx.font = "12px sans-serif";
