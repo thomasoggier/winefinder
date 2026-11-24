@@ -1,229 +1,118 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="mb-5">
-  <h1 class="text-xl font-bold text-rose-950">1. Dégustation & Notes</h1>
-  <p class="text-xs text-stone-600 mt-1">Basculez entre le mode guidé et la note libre par vin à tout moment : vos
-    textes sont conservés et sauvegardés automatiquement.</p>
+  <h1 class="text-2xl font-bold text-rose-950">📝 Dégustation</h1>
+  <p class="text-xs text-stone-500">Notez vos impressions sur chaque vin avant la mise en carafe.</p>
 </div>
 
-<div class="space-y-6">
-  {% for wine in wines %}
-  {% set note = notes.get(wine['id'], {}) %}
-  {% set current_mode = note.get('note_mode', 'guided') %}
-  <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-stone-200 wine-card"
-    data-wine-id="{{ wine['id'] }}" data-mode="{{ current_mode }}">
-    {% if wine['image_path'] %}
-    <div class="relative h-52 bg-stone-900">
-      <img src="{{ url_for('static', filename=wine['image_path']) }}" alt="{{ wine['name'] }}"
-        class="w-full h-full object-contain">
-    </div>
-    {% endif %}
+{% if wines %}
+<div class="space-y-4">
+  {% for w in wines %}
+  {% set n = notes.get(w['id'], {}) %}
+  {% set mode = n.get('note_mode', 'guided') %}
+  <form method="POST" action="{{ url_for('game.tasting') }}"
+    class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 space-y-3 note-form" data-wine-id="{{ w['id'] }}">
+    <input type="hidden" name="wine_id" value="{{ w['id'] }}">
+    <input type="hidden" name="note_mode" value="{{ mode }}">
 
-    <div class="p-4">
-      <div class="flex justify-between items-start gap-2 mb-3">
-        <div>
-          <h2 class="font-bold text-lg text-rose-950 leading-tight">{{ wine['name'] }}</h2>
-          <p class="text-xs text-stone-500 mt-0.5">{{ wine['region'] }} {{ '• ' + wine['year'] if wine['year'] }}</p>
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        {% if w['image_path'] %}
+        <img src="{{ url_for('static', filename=w['image_path']) }}" alt="{{ w['name'] }}"
+          class="w-12 h-12 rounded-xl object-cover bg-stone-900 shrink-0">
+        {% else %}
+        <div
+          class="w-12 h-12 rounded-xl bg-rose-950/10 text-rose-950 flex items-center justify-center text-lg shrink-0">🍷
         </div>
-        <span
-          class="save-badge shrink-0 text-xs px-2.5 py-1 rounded-full font-bold {{ 'bg-emerald-100 text-emerald-800' if note else 'bg-stone-100 text-stone-500' }}">
-          {{ '✓ Sauvegardé' if note else 'Brouillon' }}
-        </span>
+        {% endif %}
+        <div class="min-w-0">
+          <div class="font-bold text-base text-rose-950 truncate">{{ w['name'] }}</div>
+          <div class="text-xs text-stone-500 truncate">{{ w['region'] or '-' }} {{ '• ' + w['year'] if w['year'] }}
+          </div>
+        </div>
       </div>
-
-      <div class="grid grid-cols-2 gap-1.5 bg-stone-100 p-1 rounded-xl mb-4 border border-stone-200">
-        <button type="button" data-mode-target="guided"
-          class="mode-btn py-2 rounded-lg text-xs font-bold transition {{ 'bg-rose-900 text-white shadow-sm' if current_mode == 'guided' else 'text-stone-600' }}">
-          🧭 Avec aide (Guidé)
-        </button>
-        <button type="button" data-mode-target="free"
-          class="mode-btn py-2 rounded-lg text-xs font-bold transition {{ 'bg-rose-900 text-white shadow-sm' if current_mode == 'free' else 'text-stone-600' }}">
-          ✍️ Note libre
-        </button>
-      </div>
-
-      <form method="POST" class="space-y-3" onsubmit="event.preventDefault(); forceSave({{ wine['id'] }});">
-        <input type="hidden" name="wine_id" value="{{ wine['id'] }}">
-        <input type="hidden" name="note_mode" value="{{ current_mode }}">
-
-        <div class="guided-fields space-y-3 {{ 'hidden' if current_mode == 'free' else '' }}">
-          <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">👁️ Robe /
-              Couleur</label>
-            <input type="text" name="color" value="{{ note.get('color', '') }}" placeholder="Rubis, grenat, limpide..."
-              class="auto-field w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">👃 Nez / Odeurs</label>
-            <input type="text" name="nose" value="{{ note.get('nose', '') }}"
-              placeholder="Fruits rouges, épices, boisé..."
-              class="auto-field w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">👅 Bouche /
-              Arômes</label>
-            <textarea name="palate" rows="2" placeholder="Tanins, acidité, longueur..."
-              class="auto-field w-full border border-stone-300 rounded-xl px-3 py-2 bg-stone-50 focus:bg-white">{{ note.get('palate', '') }}</textarea>
-          </div>
-        </div>
-
-        <div class="free-fields {{ 'hidden' if current_mode != 'free' else '' }}">
-          <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">📝 Vos impressions
-            libres</label>
-          <textarea name="free_notes" rows="5"
-            placeholder="Écrivez librement vos ressentis, comparaisons, impressions..."
-            class="auto-field w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">{{ note.get('free_notes', '') }}</textarea>
-        </div>
-
-        <div class="flex items-center justify-between gap-3 pt-2">
-          <div class="flex items-center gap-2 bg-stone-100 px-3 py-2 rounded-xl border border-stone-200">
-            <span class="text-xs font-bold text-stone-600">Note :</span>
-            <select name="rating" class="auto-field bg-transparent font-bold text-rose-950 outline-none">
-              {% set current_rating = note.get('rating', 7) %}
-              {% for i in range(1, 11) %}
-              <option value="{{ i }}" {% if current_rating|int==i %}selected{% endif %}>{{ i }}/10</option>
-              {% endfor %}
-            </select>
-          </div>
-          <button type="submit"
-            class="bg-stone-800 text-white py-2.5 px-4 rounded-xl text-xs font-bold active:scale-95 transition">
-            Forcer la synchro
-          </button>
-        </div>
-      </form>
+      <span class="text-[11px] font-bold text-emerald-700 save-indicator shrink-0"></span>
     </div>
-  </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Robe</label>
+        <input type="text" name="color" value="{{ n.get('color', '') }}" placeholder="Rubis, grenat..."
+          class="w-full border border-stone-300 rounded-xl px-3 py-2 text-sm bg-stone-50 focus:bg-white">
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Nez</label>
+        <input type="text" name="nose" value="{{ n.get('nose', '') }}" placeholder="Fruits noirs, épices..."
+          class="w-full border border-stone-300 rounded-xl px-3 py-2 text-sm bg-stone-50 focus:bg-white">
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Bouche</label>
+        <input type="text" name="palate" value="{{ n.get('palate', '') }}" placeholder="Structuré, long..."
+          class="w-full border border-stone-300 rounded-xl px-3 py-2 text-sm bg-stone-50 focus:bg-white">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Notes libres</label>
+      <textarea name="free_notes" rows="2" placeholder="Ressenti global, accord mets-vins..."
+        class="w-full border border-stone-300 rounded-xl px-3 py-2 text-sm bg-stone-50 focus:bg-white">{{ n.get('free_notes', '') }}</textarea>
+    </div>
+
+    <div class="flex items-center justify-between gap-3 pt-1">
+      <label class="text-xs font-bold text-stone-600 flex items-center gap-2">
+        <span>Note / 10 :</span>
+        <input type="number" name="rating" min="0" max="10" value="{{ n.get('rating', 7) }}"
+          class="w-16 border border-stone-300 rounded-xl px-2.5 py-1.5 text-center font-extrabold text-rose-950 bg-stone-50">
+      </label>
+      <button type="submit"
+        class="bg-rose-900 hover:bg-rose-950 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition active:scale-95">
+        💾 Enregistrer
+      </button>
+    </div>
+  </form>
   {% endfor %}
 </div>
+{% else %}
+<div class="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 text-center text-sm text-stone-500">
+  Aucune bouteille enregistrée pour le moment.
+</div>
+{% endif %}
 
 <script>
-  const timers = {};
-  const USER_KEY = "wine_notes_{{ session['user_id'] }}_";
-  const ACTIVE_BTN_CLASSES = ['bg-rose-900', 'text-white', 'shadow-sm'];
-  const INACTIVE_BTN_CLASSES = ['text-stone-600'];
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.note-form').forEach(function (form) {
+      const wineId = form.getAttribute('data-wine-id');
+      const indicator = form.querySelector('.save-indicator');
+      let timer = null;
 
-  function applyVisualMode(card, mode) {
-    const validMode = mode === 'free' ? 'free' : 'guided';
-    card.dataset.mode = validMode;
-
-    const modeInput = card.querySelector('[name="note_mode"]');
-    if (modeInput) modeInput.value = validMode;
-
-    const guidedDiv = card.querySelector('.guided-fields');
-    const freeDiv = card.querySelector('.free-fields');
-
-    if (guidedDiv) guidedDiv.classList.toggle('hidden', validMode !== 'guided');
-    if (freeDiv) freeDiv.classList.toggle('hidden', validMode !== 'free');
-
-    card.querySelectorAll('.mode-btn').forEach(btn => {
-      const isSelected = btn.dataset.modeTarget === validMode;
-      btn.classList.remove(...ACTIVE_BTN_CLASSES, ...INACTIVE_BTN_CLASSES);
-      if (isSelected) {
-        btn.classList.add(...ACTIVE_BTN_CLASSES);
-      } else {
-        btn.classList.add(...INACTIVE_BTN_CLASSES);
+      function autosave() {
+        const payload = {
+          wine_id: Number(wineId),
+          color: form.querySelector('[name="color"]')?.value || '',
+          nose: form.querySelector('[name="nose"]')?.value || '',
+          palate: form.querySelector('[name="palate"]')?.value || '',
+          free_notes: form.querySelector('[name="free_notes"]')?.value || '',
+          rating: form.querySelector('[name="rating"]')?.value || 7
+        };
+        fetch("{{ url_for('game.api_save_note') }}", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function (r) {
+          if (r.ok && indicator) {
+            indicator.textContent = '✓ Sauvé';
+            setTimeout(function () { indicator.textContent = ''; }, 1500);
+          }
+        }).catch(function () { });
       }
-    });
-  }
 
-  function getCardData(card) {
-    return {
-      wine_id: card.dataset.wineId,
-      note_mode: card.dataset.mode || 'guided',
-      color: card.querySelector('[name="color"]').value,
-      nose: card.querySelector('[name="nose"]').value,
-      palate: card.querySelector('[name="palate"]').value,
-      free_notes: card.querySelector('[name="free_notes"]').value,
-      rating: card.querySelector('[name="rating"]').value
-    };
-  }
-
-  function sendToServer(card) {
-    const data = getCardData(card);
-    const badge = card.querySelector('.save-badge');
-
-    fetch('/api/save_note', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-      .then(res => {
-        if (res.ok) {
-          badge.textContent = '✓ Sauvegardé';
-          badge.className = 'save-badge shrink-0 text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800';
-          localStorage.removeItem(USER_KEY + data.wine_id);
-        }
-      })
-      .catch(() => {
-        badge.textContent = '⚠️ En attente réseau (gardé en local)';
-        badge.className = 'save-badge shrink-0 text-xs px-2.5 py-1 rounded-full font-bold bg-amber-100 text-amber-800';
-      });
-  }
-
-  function scheduleSave(card) {
-    const wineId = card.dataset.wineId;
-    const data = getCardData(card);
-    localStorage.setItem(USER_KEY + wineId, JSON.stringify(data));
-
-    const badge = card.querySelector('.save-badge');
-    badge.textContent = '⏳ Saisie...';
-    badge.className = 'save-badge shrink-0 text-xs px-2.5 py-1 rounded-full font-bold bg-amber-100 text-amber-800';
-
-    clearTimeout(timers[wineId]);
-    timers[wineId] = setTimeout(() => sendToServer(card), 800);
-  }
-
-  function forceSave(wineId) {
-    const card = document.querySelector(`.wine-card[data-wine-id="${wineId}"]`);
-    if (card) sendToServer(card);
-  }
-
-  document.querySelectorAll('.wine-card').forEach(card => {
-    const wineId = card.dataset.wineId;
-    const savedDraft = localStorage.getItem(USER_KEY + wineId);
-    let initialMode = card.dataset.mode || 'guided';
-
-    if (savedDraft) {
-      const draft = JSON.parse(savedDraft);
-      card.querySelector('[name="color"]').value = draft.color ?? card.querySelector('[name="color"]').value;
-      card.querySelector('[name="nose"]').value = draft.nose ?? card.querySelector('[name="nose"]').value;
-      card.querySelector('[name="palate"]').value = draft.palate ?? card.querySelector('[name="palate"]').value;
-      card.querySelector('[name="free_notes"]').value = draft.free_notes ?? card.querySelector('[name="free_notes"]').value;
-      card.querySelector('[name="rating"]').value = draft.rating ?? card.querySelector('[name="rating"]').value;
-      if (draft.note_mode) {
-        initialMode = draft.note_mode;
-      }
-      applyVisualMode(card, initialMode);
-      sendToServer(card);
-    } else {
-      applyVisualMode(card, initialMode);
-    }
-
-    card.querySelectorAll('.mode-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        applyVisualMode(card, btn.dataset.modeTarget);
-        scheduleSave(card);
+      form.querySelectorAll('input, textarea').forEach(function (el) {
+        el.addEventListener('input', function () {
+          clearTimeout(timer);
+          timer = setTimeout(autosave, 600);
+        });
       });
     });
-
-    card.querySelectorAll('.auto-field').forEach(field => {
-      field.addEventListener('input', () => scheduleSave(card));
-      field.addEventListener('change', () => scheduleSave(card));
-    });
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      document.querySelectorAll('.wine-card').forEach(card => {
-        const wineId = card.dataset.wineId;
-        if (localStorage.getItem(USER_KEY + wineId)) {
-          sendToServer(card);
-        }
-      });
-    }
   });
 </script>
 {% endblock %}

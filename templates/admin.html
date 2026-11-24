@@ -303,7 +303,7 @@
     </form>
 
     {% if can_export_pdf %}
-    <a href="{{ url_for('export_results_pdf') }}"
+    <a href="{{ url_for('game.export_results_pdf') }}"
       class="block text-center w-full py-3 px-4 rounded-xl font-extrabold text-sm bg-rose-950 hover:bg-rose-900 text-white shadow-sm active:scale-95 transition">
       📄 Exporter les résultats globaux (PDF)
     </a>
