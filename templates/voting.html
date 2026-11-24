@@ -3,7 +3,8 @@
 <div class="mb-5">
   <h1 class="text-2xl font-bold text-rose-950">🗳️ Vote à l'aveugle</h1>
   <p class="text-xs text-stone-500">
-    Associez chaque vin à son numéro de carafe ({{ validated_players_count }}/{{ total_players }} joueur(s) validé(s)).
+    Associez chaque vin à son numéro de carafe (<span id="validated-count-label">{{ validated_players_count }}/{{
+      total_players }}</span> joueur(s) validé(s)).
   </p>
 </div>
 
@@ -28,9 +29,20 @@
   <div
     class="bg-white p-4 rounded-2xl shadow-sm border {{ 'border-red-400 bg-red-50/20' if item['has_error'] else 'border-stone-200' }} space-y-2.5">
     <div class="flex items-center justify-between gap-3">
-      <div class="min-w-0">
-        <div class="font-bold text-base text-rose-950 truncate">{{ w['name'] }}</div>
-        <div class="text-xs text-stone-500 truncate">{{ w['region'] or '-' }} {{ '• ' + w['year'] if w['year'] }}</div>
+      <div class="flex items-center gap-3 min-w-0">
+        {% if w['image_path'] %}
+        <img src="{{ url_for('static', filename=w['image_path']) }}" alt="{{ w['name'] }}"
+          class="w-12 h-12 rounded-xl object-cover bg-stone-900 shrink-0">
+        {% else %}
+        <div
+          class="w-12 h-12 rounded-xl bg-rose-950/10 text-rose-950 flex items-center justify-center text-lg shrink-0">🍷
+        </div>
+        {% endif %}
+        <div class="min-w-0">
+          <div class="font-bold text-base text-rose-950 truncate">{{ w['name'] }}</div>
+          <div class="text-xs text-stone-500 truncate">{{ w['region'] or '-' }} {{ '• ' + w['year'] if w['year'] }}
+          </div>
+        </div>
       </div>
       <select name="wine_{{ w['id'] }}" data-wine-id="{{ w['id'] }}" {% if is_vote_validated %}disabled{% endif %}
         class="vote-select border border-stone-300 rounded-xl px-3 py-2 text-sm font-extrabold text-rose-950 bg-stone-50 shrink-0">
@@ -62,7 +74,7 @@
 </form>
 
 {% if pending_voters %}
-<div class="mt-6 bg-white p-4 rounded-2xl shadow-sm border border-stone-200 text-xs">
+<div id="pending-voters-box" class="mt-6 bg-white p-4 rounded-2xl shadow-sm border border-stone-200 text-xs">
   <div class="font-bold text-stone-700 mb-2">En attente de validation :</div>
   <div class="flex flex-wrap gap-1.5">
     {% for pv in pending_voters %}
@@ -74,19 +86,64 @@
 </div>
 {% endif %}
 
+<div id="voting-poll-banner" class="mt-4 text-center text-[11px] text-stone-500">
+  Vérification automatique de l'état de la partie toutes les 4s…
+</div>
+
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.vote-select').forEach(function (sel) {
-      sel.addEventListener('change', function () {
-        const wineId = sel.getAttribute('data-wine-id');
-        const carafe = sel.value || null;
-        fetch("{{ url_for('game.api_save_vote') }}", {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wine_id: Number(wineId), carafe: carafe })
-        }).catch(function () { });
-      });
+  document.addEventListener("DOMContentLoaded", function () {
+    var saveVoteUrl = "{{ url_for('game.api_save_vote') }}";
+    var statusUrl = "{{ url_for('game.api_game_status') }}";
+    var indexUrl = "{{ url_for('game.index') }}";
+    var initialPhase = "VOTING";
+    var initialValidatedCount = {{ (validated_players_count or 0) | int }};
+  var banner = document.getElementById("voting-poll-banner");
+
+  var selects = document.querySelectorAll(".vote-select");
+  selects.forEach(function (sel) {
+    sel.addEventListener("change", function () {
+      var wineId = sel.getAttribute("data-wine-id");
+      var carafe = sel.value || null;
+      fetch(saveVoteUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wine_id: Number(wineId), carafe: carafe })
+      }).catch(function () { });
     });
   });
+
+  function isUserEditingSelect() {
+    var active = document.activeElement;
+    return Boolean(active && active.tagName === "SELECT");
+  }
+
+  setInterval(function () {
+    if (document.hidden || isUserEditingSelect()) {
+      return;
+    }
+
+    fetch(statusUrl, { cache: "no-store" })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (data) {
+        if (!data) {
+          return;
+        }
+        if (data.phase !== initialPhase) {
+          window.location.href = indexUrl;
+          return;
+        }
+        if (data.validated_players_count !== initialValidatedCount) {
+          window.location.reload();
+          return;
+        }
+        if (banner && data.all_votes_validated) {
+          banner.innerHTML = '<span class="text-emerald-700 font-bold">✓ Tous les joueurs ont validé leurs votes — en attente de la révélation des résultats…</span>';
+        }
+      })
+      .catch(function () { });
+  }, 4000);
+});
 </script>
 {% endblock %}

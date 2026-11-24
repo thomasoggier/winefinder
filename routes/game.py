@@ -304,6 +304,60 @@ def api_save_vote():
     return jsonify({'status': 'ok'})
 
 
+@game_bp.route('/api/game_status')
+@login_required
+def api_game_status():
+    db = get_db()
+    state = db.execute('SELECT phase, results_reveal FROM game_state WHERE id = 1').fetchone()
+    wines = db.execute('SELECT id, carafe_number FROM wines').fetchall()
+    users = db.execute('SELECT id, username, is_admin, votes_submitted FROM users ORDER BY username').fetchall()
+    all_votes = db.execute('SELECT user_id, carafe_number, guessed_wine_id FROM votes').fetchall()
+
+    expected_carafes = {w['carafe_number'] for w in wines if w['carafe_number'] is not None}
+    expected_wine_ids = {w['id'] for w in wines if w['carafe_number'] is not None}
+    expected_votes_count = len(expected_carafes)
+    total_wines = len(wines)
+
+    votes_by_user = {}
+    for v in all_votes:
+        votes_by_user.setdefault(v['user_id'], []).append(v)
+
+    players_progress = []
+    pending_voters = []
+    for u in users:
+        notes_done = db.execute('SELECT COUNT(*) as c FROM notes WHERE user_id = ?', (u['id'],)).fetchone()['c']
+        u_votes = votes_by_user.get(u['id'], [])
+        is_validated, saved_count = inspect_user_votes(u, u_votes, expected_carafes, expected_wine_ids)
+        if not is_validated and expected_votes_count > 0:
+            pending_voters.append({
+                'id': u['id'],
+                'username': u['username'],
+                'voted_count': saved_count,
+                'expected_count': expected_votes_count
+            })
+        players_progress.append({
+            'user_id': u['id'],
+            'username': u['username'],
+            'notes_done': notes_done,
+            'total_wines': total_wines,
+            'votes_done': saved_count,
+            'expected_votes': expected_votes_count,
+            'votes_validated': is_validated
+        })
+
+    total_players = len(users)
+    validated_players_count = max(0, total_players - len(pending_voters)) if expected_votes_count > 0 else 0
+
+    return jsonify({
+        'phase': state['phase'] if state else 'TASTING',
+        'results_reveal': state['results_reveal'] if state else 'all',
+        'validated_players_count': validated_players_count,
+        'total_players': total_players,
+        'all_votes_validated': (total_players > 0 and expected_votes_count > 0 and len(pending_voters) == 0),
+        'players': players_progress
+    })
+
+
 @game_bp.route('/results')
 @login_required
 def results():

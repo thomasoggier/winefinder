@@ -8,7 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-stone-100 text-stone-800 min-h-screen pb-20">
+<body class="bg-stone-100 text-stone-800 min-h-screen pb-8">
   {% if session.get('user_id') %}
   <header class="bg-rose-950 text-white px-4 py-3 shadow-md sticky top-0 z-30">
     <div class="max-w-3xl mx-auto flex items-center justify-between gap-2">
@@ -56,37 +56,72 @@
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 text-center space-y-3 mt-6">
       <div class="text-3xl">⏳</div>
       <p class="font-bold text-rose-950 text-base">{{ message }}</p>
-      <button type="button" onclick="window.location.reload()"
-        class="mt-2 inline-flex items-center gap-1.5 bg-rose-900 hover:bg-rose-950 text-white text-xs font-bold px-4 py-2 rounded-xl transition">
-        🔄 Actualiser
-      </button>
+      <p class="text-xs text-stone-500">
+        Actualisation automatique dans <span id="auto-refresh-countdown" class="font-extrabold text-rose-900">5</span>s…
+      </p>
+      <div class="pt-1 flex items-center justify-center gap-2 flex-wrap">
+        <button type="button" onclick="window.location.reload()"
+          class="inline-flex items-center gap-1.5 bg-rose-900 hover:bg-rose-950 text-white text-xs font-bold px-4 py-2 rounded-xl transition">
+          🔄 Actualiser maintenant
+        </button>
+        <button type="button" id="toggle-auto-refresh"
+          class="inline-flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300 text-xs font-bold px-3.5 py-2 rounded-xl transition">
+          ⏸️ Mettre en pause
+        </button>
+      </div>
     </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const intervalSeconds = 5;
+        let remaining = intervalSeconds;
+        let paused = false;
+
+        const countdownEl = document.getElementById('auto-refresh-countdown');
+        const toggleBtn = document.getElementById('toggle-auto-refresh');
+
+        function updateLabel() {
+          if (countdownEl) {
+            countdownEl.textContent = remaining;
+          }
+        }
+
+        if (toggleBtn) {
+          toggleBtn.addEventListener('click', function () {
+            paused = !paused;
+            if (paused) {
+              toggleBtn.textContent = '▶️ Reprendre auto-refresh';
+            } else {
+              remaining = intervalSeconds;
+              updateLabel();
+              toggleBtn.textContent = '⏸️ Mettre en pause';
+            }
+          });
+        }
+
+        // Évite de recharger si l'utilisateur revient depuis l'historique arrière du navigateur
+        window.addEventListener('pageshow', function (event) {
+          if (event.persisted) {
+            remaining = intervalSeconds;
+            updateLabel();
+          }
+        });
+
+        setInterval(function () {
+          if (paused || document.hidden) return;
+          remaining -= 1;
+          if (remaining <= 0) {
+            window.location.reload();
+          } else {
+            updateLabel();
+          }
+        }, 1000);
+      });
+    </script>
     {% else %}
     {% block content %}{% endblock %}
     {% endif %}
   </main>
-
-  {% if session.get('user_id') %}
-  <nav class="fixed bottom-0 inset-x-0 bg-white border-t border-stone-200 shadow-lg z-30">
-    <div class="max-w-3xl mx-auto grid grid-cols-3 text-center text-xs font-bold">
-      <a href="{{ url_for('game.tasting') }}"
-        class="py-3 flex flex-col items-center gap-0.5 {{ 'text-rose-950 bg-rose-50/70' if request.endpoint == 'game.tasting' else 'text-stone-500 hover:text-rose-900' }}">
-        <span>📝</span>
-        <span>Déguster</span>
-      </a>
-      <a href="{{ url_for('game.voting') }}"
-        class="py-3 flex flex-col items-center gap-0.5 {{ 'text-rose-950 bg-rose-50/70' if request.endpoint == 'game.voting' else 'text-stone-500 hover:text-rose-900' }}">
-        <span>🗳️</span>
-        <span>Voter</span>
-      </a>
-      <a href="{{ url_for('game.results') }}"
-        class="py-3 flex flex-col items-center gap-0.5 {{ 'text-rose-950 bg-rose-50/70' if request.endpoint == 'game.results' else 'text-stone-500 hover:text-rose-900' }}">
-        <span>🏆</span>
-        <span>Résultats</span>
-      </a>
-    </div>
-  </nav>
-  {% endif %}
 </body>
 
 </html>

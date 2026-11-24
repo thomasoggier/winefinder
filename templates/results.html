@@ -104,4 +104,41 @@
   </div>
   {% endfor %}
 </div>
+
+<div id="results-poll-banner" class="mt-4 text-center text-[11px] text-stone-500">
+  Vérification automatique de l'affichage des résultats toutes les 4s…
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var statusUrl = "{{ url_for('game.api_game_status') }}";
+    var indexUrl = "{{ url_for('game.index') }}";
+    var initialPhase = "RESULTS";
+    var initialReveal = "{{ results_reveal or 'all' }}";
+
+    setInterval(function () {
+      if (document.hidden) {
+        return;
+      }
+
+      fetch(statusUrl, { cache: "no-store" })
+        .then(function (r) {
+          return r.ok ? r.json() : null;
+        })
+        .then(function (data) {
+          if (!data) {
+            return;
+          }
+          if (data.phase !== initialPhase) {
+            window.location.href = indexUrl;
+            return;
+          }
+          if (data.results_reveal !== initialReveal) {
+            window.location.reload();
+          }
+        })
+        .catch(function () { });
+    }, 4000);
+  });
+</script>
 {% endblock %}

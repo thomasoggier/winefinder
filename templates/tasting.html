@@ -78,41 +78,107 @@
 </div>
 {% endif %}
 
+<div id="tasting-poll-banner" class="mt-4 text-center text-[11px] text-stone-500">
+  Vérification automatique de la phase en cours toutes les 4s…
+</div>
+
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.note-form').forEach(function (form) {
-      const wineId = form.getAttribute('data-wine-id');
-      const indicator = form.querySelector('.save-indicator');
-      let timer = null;
+  document.addEventListener("DOMContentLoaded", function () {
+    var saveNoteUrl = "{{ url_for('game.api_save_note') }}";
+    var statusUrl = "{{ url_for('game.api_game_status') }}";
+    var indexUrl = "{{ url_for('game.index') }}";
+    var initialPhase = "TASTING";
+    var banner = document.getElementById("tasting-poll-banner");
+    var pendingPhaseChange = false;
+    var activeSaveCount = 0;
+
+    function maybeRedirectIfPhaseChanged() {
+      if (pendingPhaseChange && activeSaveCount === 0) {
+        window.location.href = indexUrl;
+      }
+    }
+
+    function isUserEditingField() {
+      var active = document.activeElement;
+      if (!active) return false;
+      var tag = active.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    }
+
+    document.querySelectorAll(".note-form").forEach(function (form) {
+      var wineId = form.getAttribute("data-wine-id");
+      var indicator = form.querySelector(".save-indicator");
+      var timer = null;
 
       function autosave() {
-        const payload = {
+        var payload = {
           wine_id: Number(wineId),
-          color: form.querySelector('[name="color"]')?.value || '',
-          nose: form.querySelector('[name="nose"]')?.value || '',
-          palate: form.querySelector('[name="palate"]')?.value || '',
-          free_notes: form.querySelector('[name="free_notes"]')?.value || '',
-          rating: form.querySelector('[name="rating"]')?.value || 7
+          color: form.querySelector('[name="color"]') ? form.querySelector('[name="color"]').value : "",
+          nose: form.querySelector('[name="nose"]') ? form.querySelector('[name="nose"]').value : "",
+          palate: form.querySelector('[name="palate"]') ? form.querySelector('[name="palate"]').value : "",
+          free_notes: form.querySelector('[name="free_notes"]') ? form.querySelector('[name="free_notes"]').value : "",
+          rating: form.querySelector('[name="rating"]') ? form.querySelector('[name="rating"]').value : 7
         };
-        fetch("{{ url_for('game.api_save_note') }}", {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+
+        activeSaveCount += 1;
+        fetch(saveNoteUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         }).then(function (r) {
           if (r.ok && indicator) {
-            indicator.textContent = '✓ Sauvé';
-            setTimeout(function () { indicator.textContent = ''; }, 1500);
+            indicator.textContent = "✓ Sauvé";
+            setTimeout(function () {
+              indicator.textContent = "";
+            }, 1500);
           }
-        }).catch(function () { });
+        }).catch(function () { }).finally(function () {
+          activeSaveCount = Math.max(0, activeSaveCount - 1);
+          maybeRedirectIfPhaseChanged();
+        });
       }
 
-      form.querySelectorAll('input, textarea').forEach(function (el) {
-        el.addEventListener('input', function () {
+      form.querySelectorAll("input, textarea").forEach(function (el) {
+        el.addEventListener("input", function () {
           clearTimeout(timer);
           timer = setTimeout(autosave, 600);
         });
+        el.addEventListener("blur", function () {
+          maybeRedirectIfPhaseChanged();
+        });
       });
     });
+
+    setInterval(function () {
+      if (document.hidden) {
+        return;
+      }
+
+      if (pendingPhaseChange && !isUserEditingField()) {
+        maybeRedirectIfPhaseChanged();
+        return;
+      }
+
+      fetch(statusUrl, { cache: "no-store" })
+        .then(function (r) {
+          return r.ok ? r.json() : null;
+        })
+        .then(function (data) {
+          if (!data) {
+            return;
+          }
+          if (data.phase !== initialPhase) {
+            pendingPhaseChange = true;
+            if (banner) {
+              banner.innerHTML = '<span class="text-amber-800 font-bold">⏭️ Passage à la phase suivante détecté — redirection dès la fin de votre saisie…</span>';
+            }
+            if (!isUserEditingField()) {
+              maybeRedirectIfPhaseChanged();
+            }
+          }
+        })
+        .catch(function () { });
+    }, 4000);
   });
 </script>
 {% endblock %}
