@@ -1,162 +1,198 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="mb-6">
-  <h1 class="text-2xl font-bold text-rose-950">🗳️ Vote à l'aveugle</h1>
-  <p class="text-xs text-stone-500 mt-1">
-    Associez chaque vin à son numéro de carafe. Chaque carafe ne peut être attribuée qu'à un seul vin.
+  <h1 class="text-2xl font-bold text-rose-950">🗳️ Votes à l'aveugle</h1>
+  <p class="text-xs text-stone-500">
+    Associez chaque vin à sa carafe. Vos choix sont sauvegardés automatiquement à chaque changement.
   </p>
 </div>
 
 {% if is_vote_validated %}
-<div class="bg-white border-2 border-emerald-300 rounded-2xl p-6 shadow-sm text-center space-y-4">
-  <div class="text-4xl">⏳</div>
-  <div>
-    <span
-      class="inline-block bg-emerald-100 text-emerald-800 text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-full mb-2">
-      ✓ Vos votes sont validés
-    </span>
-    <h2 class="text-xl font-extrabold text-rose-950">En attente des autres participants</h2>
-    <p class="text-sm text-stone-600 mt-1">
-      Vos pronostics sont enregistrés. L'organisateur dévoilera les résultats dès que tout le monde aura fini.
-    </p>
-  </div>
-
-  <div class="bg-stone-50 border border-stone-200 rounded-xl p-3.5 text-xs text-stone-700 space-y-2">
-    <div class="font-bold text-stone-800">
-      Progression globale : {{ validated_players_count }} / {{ total_players }} joueur{{ 's' if total_players > 1 else
-      '' }} validé{{ 's' if validated_players_count > 1 else '' }}
-    </div>
-    {% if pending_voters %}
-    <div class="text-amber-800">
-      Encore en cours :
-      <span class="font-bold">
-        {% for pv in pending_voters %}
-        {{ pv['username'] }} ({{ pv['voted_count'] }}/{{ pv['expected_count'] }}){{ ', ' if not loop.last }}
-        {% endfor %}
+<div class="bg-white border-2 border-emerald-500/40 rounded-2xl p-5 shadow-sm mb-6 space-y-4">
+  <div class="flex items-center justify-between gap-2 flex-wrap">
+    <div>
+      <span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-extrabold px-2.5 py-0.5 rounded-full mb-1">
+        ✓ Votes validés
       </span>
+      <h2 class="text-lg font-extrabold text-rose-950">En attente des autres participants</h2>
     </div>
-    {% else %}
-    <div class="text-emerald-700 font-bold">
-      Tous les participants ont validé leurs votes !
+    <div class="text-right">
+      <div class="text-sm font-extrabold text-rose-950">{{ validated_players_count }} / {{ total_players }}</div>
+      <div class="text-[11px] text-stone-500">joueurs prêts</div>
     </div>
-    {% endif %}
   </div>
 
-  <div class="pt-1">
-    <a href="{{ url_for('voting') }}"
-      class="inline-block bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold px-4 py-2.5 rounded-xl transition">
-      🔄 Actualiser l'état
-    </a>
+  {% if pending_voters %}
+  <div class="bg-stone-50 border border-stone-200 rounded-xl p-3">
+    <div class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">Encore en train de voter :</div>
+    <div class="flex flex-wrap gap-2">
+      {% for p in pending_voters %}
+      <span class="text-xs font-bold bg-amber-100 text-amber-900 px-2.5 py-1 rounded-full">
+        {{ p['username'] }} ({{ p['voted_count'] }}/{{ p['expected_count'] }})
+      </span>
+      {% endfor %}
+    </div>
   </div>
+  {% else %}
+  <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs font-bold text-emerald-800">
+    Tout le monde a validé ! L'administrateur peut maintenant lancer la révélation des résultats.
+  </div>
+  {% endif %}
+
+  <button type="button" onclick="window.location.reload();"
+    class="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-stone-800 hover:bg-stone-900 text-white transition">
+    🔄 Actualiser l'état des votes
+  </button>
 </div>
 {% else %}
 
 {% if validation_errors %}
-<div class="bg-red-50 border border-red-200 text-red-800 rounded-2xl p-4 mb-5 space-y-1">
-  <div class="font-bold text-sm">⚠️ Impossible de valider vos votes :</div>
-  <ul class="list-disc list-inside text-xs space-y-0.5">
-    {% for err in validation_errors %}
-    <li>{{ err }}</li>
-    {% endfor %}
-  </ul>
+<div class="bg-red-50 border border-red-300 text-red-800 rounded-2xl p-4 mb-6 text-xs space-y-1">
+  <div class="font-extrabold text-sm mb-1">⚠️ Impossible de valider en l'état :</div>
+  {% for err in validation_errors %}
+  <div>• {{ err }}</div>
+  {% endfor %}
 </div>
 {% endif %}
 
 <form method="POST" id="voting-form" class="space-y-4">
-  {% for item in cards %}
-  {% set w = item['wine'] %}
-  {% set n = item['note'] %}
-  <div id="card-{{ w['id'] }}"
-    class="bg-white rounded-2xl shadow-sm p-4 border-2 transition {{ 'border-red-400 bg-red-50/30' if item['has_error'] else 'border-stone-200' }}">
+  {% for card in cards %}
+  {% set w = card['wine'] %}
+  {% set n = card['note'] %}
+  <div
+    class="bg-white rounded-2xl p-4 shadow-sm border {{ 'border-red-400 ring-2 ring-red-100' if card['has_error'] else 'border-stone-200' }}">
     <div class="flex items-start justify-between gap-3 mb-3">
-      <div class="min-w-0">
-        <h2 class="font-bold text-base text-rose-950 truncate">{{ w['name'] }}</h2>
-        <p class="text-xs text-stone-500">
-          {{ w['region'] or 'Région non précisée' }} {{ '• ' + w['year'] if w['year'] }}
-        </p>
+      <div class="flex items-center gap-3 min-w-0">
+        {% if w['image_path'] %}
+        <img src="{{ url_for('static', filename=w['image_path']) }}" alt="{{ w['name'] }}"
+          class="w-12 h-12 rounded-xl object-cover bg-stone-900 shrink-0">
+        {% else %}
+        <div
+          class="w-12 h-12 rounded-xl bg-rose-950/10 text-rose-950 flex items-center justify-center text-xl shrink-0">
+          🍷
+        </div>
+        {% endif %}
+        <div class="min-w-0">
+          <h2 class="font-extrabold text-base text-rose-950 truncate">{{ w['name'] }}</h2>
+          <p class="text-xs text-stone-500 truncate">
+            {{ w['region'] or 'Région non précisée' }}
+            {% if w['year'] %} • {{ w['year'] }}{% endif %}
+          </p>
+        </div>
       </div>
-      {% if n.get('rating') %}
-      <span class="bg-amber-100 text-amber-900 text-xs font-bold px-2.5 py-0.5 rounded-full shrink-0">
-        Ma note : {{ n.get('rating') }}/10
-      </span>
-      {% endif %}
     </div>
 
-    {% if n.get('color') or n.get('nose') or n.get('palate') or n.get('free_notes') %}
-    <div class="bg-stone-50 rounded-xl p-2.5 mb-3 text-xs text-stone-600 space-y-1 border border-stone-100">
-      {% if n.get('color') %}<p><span class="font-semibold">Robe :</span> {{ n.get('color') }}</p>{% endif %}
-      {% if n.get('nose') %}<p><span class="font-semibold">Nez :</span> {{ n.get('nose') }}</p>{% endif %}
-      {% if n.get('palate') %}<p><span class="font-semibold">Bouche :</span> {{ n.get('palate') }}</p>{% endif %}
-      {% if n.get('free_notes') %}<p><span class="font-semibold">Notes :</span> {{ n.get('free_notes') }}</p>{% endif %}
+    {% if n %}
+    <div class="bg-stone-50 border border-stone-100 rounded-xl p-2.5 mb-3 text-xs text-stone-600">
+      <span class="font-bold text-stone-700">Vos notes :</span>
+      Note <b>{{ n.get('rating', '-') }}/10</b>
+      {% if n.get('color') %} • Robe : {{ n.get('color') }}{% endif %}
+      {% if n.get('nose') %} • Nez : {{ n.get('nose') }}{% endif %}
+      {% if n.get('palate') %} • Bouche : {{ n.get('palate') }}{% endif %}
+      {% if n.get('free_notes') %} • {{ n.get('free_notes') }}{% endif %}
     </div>
     {% endif %}
 
     <div>
-      <label for="select-{{ w['id'] }}" class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">
-        Carafe associée à ce vin
+      <label for="select_wine_{{ w['id'] }}"
+        class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">
+        Carafe associée
       </label>
-      <select id="select-{{ w['id'] }}" name="wine_{{ w['id'] }}" data-wine-id="{{ w['id'] }}"
-        class="vote-select w-full border rounded-xl px-3 py-2.5 font-bold text-sm {{ 'border-red-400 bg-red-50 text-red-900' if item['has_error'] else 'border-stone-300 bg-stone-50 text-stone-900' }}">
+      <select id="select_wine_{{ w['id'] }}" name="wine_{{ w['id'] }}" data-wine-id="{{ w['id'] }}"
+        class="carafe-select w-full border {{ 'border-red-400 bg-red-50/40' if card['has_error'] else 'border-stone-300 bg-stone-50 focus:bg-white' }} rounded-xl px-3 py-2.5 font-bold text-rose-950">
         <option value="">-- Choisir une carafe --</option>
         {% for c in carafes %}
-        <option value="{{ c }}" {% if item['assigned_carafe']==c %}selected{% endif %}>
+        <option value="{{ c }}" {% if card['assigned_carafe']==c %}selected{% endif %}>
           Carafe N°{{ c }}
         </option>
         {% endfor %}
       </select>
-      <p class="duplicate-hint hidden text-[11px] font-bold text-red-700 mt-1">
-        Cette carafe est déjà sélectionnée sur un autre vin.
-      </p>
+      {% if card['is_duplicate_carafe'] %}
+      <p class="text-[11px] font-bold text-red-700 mt-1">Cette carafe est assignée à plusieurs vins.</p>
+      {% elif card['is_missing'] %}
+      <p class="text-[11px] font-bold text-red-700 mt-1">Veuillez sélectionner une carafe pour ce vin.</p>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
 
   <button type="submit"
-    class="w-full bg-rose-950 hover:bg-rose-900 text-white py-3.5 rounded-2xl font-extrabold text-sm shadow-md active:scale-95 transition">
-    ✓ Valider mes votes
+    class="w-full py-3.5 px-4 rounded-2xl font-extrabold text-sm bg-rose-900 hover:bg-rose-950 text-white shadow-sm active:scale-95 transition">
+    ✅ Valider définitivement mes votes
   </button>
 </form>
 
+<div id="autosave-toast"
+  class="fixed bottom-4 right-4 z-50 hidden bg-stone-900/90 text-white text-xs font-bold px-3.5 py-2 rounded-full shadow-lg">
+  ✓ Choix sauvegardé
+</div>
+
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    const selects = Array.from(document.querySelectorAll('.vote-select'));
+    const selects = Array.from(document.querySelectorAll('.carafe-select'));
+    const toast = document.getElementById('autosave-toast');
+    let toastTimer = null;
 
-    function refreshDuplicates() {
-      const counts = {};
-      selects.forEach(sel => {
-        if (sel.value) {
-          counts[sel.value] = (counts[sel.value] || 0) + 1;
-        }
-      });
+    function showSavedBadge(text, isError) {
+      if (!toast) return;
+      toast.textContent = text;
+      toast.classList.remove('hidden', 'bg-stone-900/90', 'bg-red-700');
+      toast.classList.add(isError ? 'bg-red-700' : 'bg-stone-900/90');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.add('hidden'), 1800);
+    }
 
-      selects.forEach(sel => {
-        const card = document.getElementById('card-' + sel.dataset.wineId);
-        const hint = card ? card.querySelector('.duplicate-hint') : null;
-        const isDup = sel.value && counts[sel.value] > 1;
-        if (hint) {
-          hint.classList.toggle('hidden', !isDup);
-        }
-        if (card) {
-          card.classList.toggle('border-red-400', Boolean(isDup));
-        }
-      });
+    function saveChoice(wineId, carafeVal) {
+      return fetch('{{ url_for("api_save_vote") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({
+          wine_id: parseInt(wineId, 10),
+          carafe: carafeVal ? parseInt(carafeVal, 10) : null
+        })
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('Erreur sauvegarde');
+          return res.json();
+        })
+        .then(() => {
+          showSavedBadge('✓ Choix sauvegardé', false);
+        })
+        .catch(() => {
+          showSavedBadge('⚠️ Connexion interrompue', true);
+        });
     }
 
     selects.forEach(sel => {
       sel.addEventListener('change', function () {
-        refreshDuplicates();
-        fetch("{{ url_for('api_save_vote') }}", {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            wine_id: sel.dataset.wineId,
-            carafe: sel.value || null
-          })
-        });
+        const wineId = this.getAttribute('data-wine-id');
+        const chosenVal = this.value;
+
+        if (chosenVal) {
+          selects.forEach(other => {
+            if (other !== this && other.value === chosenVal) {
+              other.value = '';
+              const otherWineId = other.getAttribute('data-wine-id');
+              saveChoice(otherWineId, '');
+            }
+          });
+        }
+
+        saveChoice(wineId, chosenVal);
       });
     });
 
-    refreshDuplicates();
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') {
+        selects.forEach(sel => {
+          const wineId = sel.getAttribute('data-wine-id');
+          if (sel.value) {
+            saveChoice(wineId, sel.value);
+          }
+        });
+      }
+    });
   });
 </script>
 {% endif %}

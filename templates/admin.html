@@ -5,51 +5,56 @@
   <p class="text-xs text-stone-500">Phase actuelle : <span class="font-bold text-rose-900">{{ phase }}</span></p>
 </div>
 
-<!-- 1. Ajouter une bouteille -->
+{% if can_add_wine %}
+<!-- 1. Ajouter une bouteille (masqué dès que la mise en carafe a commencé) -->
 <div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
   <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
     <h2 class="font-bold text-base text-rose-950">🍷 Ajouter une bouteille</h2>
-    {% if not can_add_wine %}
-    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-stone-200 text-stone-600">
-      🔒 Verrouillé (votes en cours)
-    </span>
-    {% endif %}
   </div>
 
   <form method="POST" enctype="multipart/form-data" class="space-y-3">
     <input type="hidden" name="action" value="add_wine">
     <div>
       <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Nom du vin *</label>
-      <input type="text" name="name" required {% if not can_add_wine %}disabled{% endif %}
-        placeholder="Ex : Château Margaux, Cornas..."
-        class="w-full border border-stone-300 rounded-xl px-3 py-2.5 {{ 'bg-stone-50 focus:bg-white' if can_add_wine else 'bg-stone-100 text-stone-400 cursor-not-allowed' }}">
+      <input type="text" name="name" required placeholder="Ex : Château Margaux, Cornas..."
+        class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
     </div>
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Millésime</label>
-        <input type="text" name="year" {% if not can_add_wine %}disabled{% endif %} placeholder="2018"
-          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 {{ 'bg-stone-50 focus:bg-white' if can_add_wine else 'bg-stone-100 text-stone-400 cursor-not-allowed' }}">
+        <input type="text" name="year" placeholder="2018"
+          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
       </div>
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Région / Cépage</label>
-        <input type="text" name="region" {% if not can_add_wine %}disabled{% endif %} placeholder="Bordeaux, Syrah..."
-          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 {{ 'bg-stone-50 focus:bg-white' if can_add_wine else 'bg-stone-100 text-stone-400 cursor-not-allowed' }}">
+        <input type="text" name="region" placeholder="Bordeaux, Syrah..."
+          class="w-full border border-stone-300 rounded-xl px-3 py-2.5 bg-stone-50 focus:bg-white">
       </div>
     </div>
     <div>
-      <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1">Photo de l'étiquette /
+      <label class="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1.5">Photo de l'étiquette /
         bouteille</label>
-      <input type="file" name="photo" accept="image/*" {% if not can_add_wine %}disabled{% endif %}
-        class="w-full text-xs text-stone-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold {{ 'file:bg-rose-950 file:text-white' if can_add_wine else 'file:bg-stone-200 file:text-stone-400 cursor-not-allowed' }}">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <label class="flex flex-col gap-1 p-2.5 rounded-xl border border-rose-900/25 bg-rose-50/40 cursor-pointer">
+          <span class="text-xs font-extrabold text-rose-950">📸 Prendre une photo</span>
+          <input type="file" name="camera_photo" accept="image/*" capture="environment"
+            class="w-full text-[11px] text-stone-600 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-rose-950 file:text-white">
+        </label>
+        <label class="flex flex-col gap-1 p-2.5 rounded-xl border border-stone-200 bg-stone-50 cursor-pointer">
+          <span class="text-xs font-bold text-stone-700">🖼️ Depuis la galerie</span>
+          <input type="file" name="gallery_photo" accept="image/*"
+            class="w-full text-[11px] text-stone-600 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-stone-700 file:text-white">
+        </label>
+      </div>
     </div>
-    <button type="submit" {% if not can_add_wine %}disabled{% endif %}
-      class="w-full py-3 rounded-xl font-bold text-sm shadow-sm transition {{ 'bg-rose-900 hover:bg-rose-950 text-white active:scale-95' if can_add_wine else 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none' }}">
+    <button type="submit"
+      class="w-full py-3 rounded-xl font-bold text-sm shadow-sm transition bg-rose-900 hover:bg-rose-950 text-white active:scale-95">
       + Ajouter la bouteille
     </button>
   </form>
 </div>
+{% endif %}
 
-<!-- Liste des bouteilles -->
 <!-- Liste des bouteilles -->
 <div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
   <h2 class="font-bold text-base text-rose-950 mb-3">📋 Bouteilles enregistrées ({{ wines|length }})</h2>
@@ -76,12 +81,13 @@
           </div>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
-          {% if can_add_wine %}
+          {% if can_edit_wine %}
           <button type="button" onclick="toggleEditWine({{ w['id'] }})"
             class="text-xs font-bold text-stone-700 bg-stone-200/80 hover:bg-stone-300 px-2.5 py-1.5 rounded-lg transition">
             ✏️ Modifier
           </button>
           {% endif %}
+          {% if can_add_wine %}
           <form method="POST" onsubmit="return confirm('Supprimer cette bouteille ?');">
             <input type="hidden" name="action" value="delete_wine">
             <input type="hidden" name="wine_id" value="{{ w['id'] }}">
@@ -90,10 +96,11 @@
               Supprimer
             </button>
           </form>
+          {% endif %}
         </div>
       </div>
 
-      {% if can_add_wine %}
+      {% if can_edit_wine %}
       <form id="edit-wine-{{ w['id'] }}" method="POST" enctype="multipart/form-data"
         class="hidden pt-3 border-t border-stone-200 space-y-2.5 text-xs">
         <input type="hidden" name="action" value="edit_wine">
@@ -117,10 +124,20 @@
           </div>
         </div>
         <div>
-          <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">Remplacer la
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1.5">Remplacer la
             photo</label>
-          <input type="file" name="photo" accept="image/*"
-            class="w-full text-xs text-stone-600 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-rose-950 file:text-white">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label class="flex flex-col gap-1 p-2 rounded-xl border border-rose-900/25 bg-rose-50/40 cursor-pointer">
+              <span class="text-[11px] font-extrabold text-rose-950">📸 Prendre une photo</span>
+              <input type="file" name="camera_photo" accept="image/*" capture="environment"
+                class="w-full text-[11px] text-stone-600 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-rose-950 file:text-white">
+            </label>
+            <label class="flex flex-col gap-1 p-2 rounded-xl border border-stone-200 bg-white cursor-pointer">
+              <span class="text-[11px] font-bold text-stone-700">🖼️ Depuis la galerie</span>
+              <input type="file" name="gallery_photo" accept="image/*"
+                class="w-full text-[11px] text-stone-600 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-stone-700 file:text-white">
+            </label>
+          </div>
           {% if w['image_path'] %}
           <label class="inline-flex items-center gap-1.5 mt-2 text-stone-600 cursor-pointer">
             <input type="checkbox" name="remove_photo" value="1" class="rounded border-stone-300">
@@ -147,7 +164,8 @@
   {% endif %}
 </div>
 
-<!-- 2. Désigner Personne A et Personne B -->
+{% if not carafing_completed %}
+<!-- 2. Désigner Personne A et Personne B (masqué une fois mis en carafe) -->
 <div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
   <h2 class="font-bold text-base text-rose-950 mb-1">🎭 Rôles mise en carafe à l'aveugle</h2>
   <p class="text-xs text-stone-500 mb-3">Personne A remplit les carafes ; Personne B mélange et numérote de 1 à N.</p>
@@ -185,11 +203,13 @@
     </button>
   </form>
 </div>
+{% endif %}
 
 <!-- 3. Pilotage des phases & révélation progressive des résultats -->
 <div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6 space-y-3">
   <h2 class="font-bold text-base text-rose-950 mb-1">🎬 Pilotage de la soirée</h2>
 
+  {% if not carafing_completed %}
   <form method="POST">
     <input type="hidden" name="action" value="start_blind_step1">
     <button type="submit" {% if not can_start_step1 %}disabled{% endif %}
@@ -210,15 +230,30 @@
       <input type="hidden" name="action" value="force_voting">
       <button type="submit" {% if not can_force_voting %}disabled{% endif %}
         class="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs shadow-sm transition {{ 'bg-rose-900 hover:bg-rose-950 text-white active:scale-95' if can_force_voting else 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none' }}">
-        🗳️ Revenir en mode vote (VOTING)
+        🗳️ Passer en mode vote (VOTING)
       </button>
     </form>
   </div>
+  {% else %}
+  <div class="grid grid-cols-1 gap-2.5">
+    <form method="POST">
+      <input type="hidden" name="action" value="force_voting">
+      <button type="submit" {% if not can_force_voting %}disabled{% endif %}
+        class="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs shadow-sm transition {{ 'bg-rose-900 hover:bg-rose-950 text-white active:scale-95' if can_force_voting else 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none' }}">
+        🗳️ Aller / revenir en mode vote (VOTING)
+      </button>
+    </form>
+  </div>
+  {% endif %}
 
-  {% if not carafes_ready %}
-  <p class="text-[11px] text-stone-500">
-    💡 Le mode vote est grisé tant que les vins n'ont pas tous été mis en carafe (Étape 1 / Étape 2).
-  </p>
+  {% if can_step_back and prev_phase_label %}
+  <form method="POST" onsubmit="return confirm('Revenir à l\'étape précédente ({{ prev_phase_label }}) ?');">
+    <input type="hidden" name="action" value="step_back_phase">
+    <button type="submit"
+      class="w-full py-2.5 px-3 rounded-xl font-bold text-xs bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 active:scale-95 transition">
+      ⏪ Revenir en arrière ({{ prev_phase_label }})
+    </button>
+  </form>
   {% endif %}
 
   <div class="pt-3 border-t border-stone-100 space-y-2.5">
@@ -365,6 +400,13 @@
 </div>
 
 <script>
+  function toggleEditWine(wineId) {
+    const el = document.getElementById('edit-wine-' + wineId);
+    if (el) {
+      el.classList.toggle('hidden');
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.unvalidate-form').forEach(function (form) {
       form.addEventListener('submit', function (e) {
@@ -384,12 +426,5 @@
       });
     });
   });
-
-  function toggleEditWine(wineId) {
-      const el = document.getElementById('edit-wine-' + wineId);
-      if (el) {
-        el.classList.toggle('hidden');
-      }
-    }
 </script>
 {% endblock %}

@@ -1,7 +1,6 @@
 import io
 import os
 import random
-import shutil
 import string
 import sqlite3
 from datetime import datetime, timedelta
@@ -34,7 +33,7 @@ DB_NAME = os.path.join(BASE_DIR, 'vin.db')
 
 
 def get_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -103,6 +102,7 @@ def init_db():
             conn.execute("ALTER TABLE game_state ADD COLUMN results_reveal TEXT DEFAULT 'all'")
         conn.commit()
 
+
 def archive_and_reset_database():
     os.makedirs(DB_ARCHIVE_FOLDER, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -134,6 +134,36 @@ def archive_and_reset_database():
 
     init_db()
     return archived_path
+
+
+def _delete_photo_file(rel_path):
+    if rel_path:
+        full_path = os.path.join(app.static_folder, rel_path)
+        if os.path.isfile(full_path):
+            try:
+                os.remove(full_path)
+            except OSError:
+                pass
+
+
+def _save_uploaded_wine_photo(file_storage):
+    if not file_storage or not file_storage.filename:
+        return None
+    raw_name = secure_filename(file_storage.filename)
+    _, ext = os.path.splitext(raw_name)
+    if not ext:
+        ext = ".jpg"
+    filename = f"{random.randint(1000, 9999)}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext.lower()}"
+    file_storage.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    return f"uploads/{filename}"
+
+
+def _extract_photo_from_request():
+    for field_name in ('camera_photo', 'gallery_photo', 'photo'):
+        f = request.files.get(field_name)
+        if f and f.filename:
+            return f
+    return None
 
 
 def are_wines_in_carafes(wines):
@@ -329,7 +359,6 @@ def compute_results_data(db, uid=None):
     hardest_wine = min(wine_stats, key=lambda x: (x['correct_count'], -x['carafe_number'])) if wine_stats else None
     easiest_wine = max(wine_stats, key=lambda x: (x['correct_count'], -x['carafe_number'])) if wine_stats else None
 
-    # Statistiques amusantes
     poker_candidates = [p for p in leaderboard if p['best_single_weight'] > 0]
     poker_winner = max(
         poker_candidates,
@@ -341,7 +370,6 @@ def compute_results_data(db, uid=None):
     most_strict = min(raters, key=lambda x: x['avg_given_rating']) if raters else None
 
     rated_wines = [ws for ws in wine_stats if ws['avg_rating'] is not None]
-    # Grand écart : note élevée mais faible réussite
     surprise_trap = max(
         rated_wines,
         key=lambda x: (x['avg_rating'] - (x['success_rate'] / 10.0))
@@ -469,30 +497,6 @@ def build_results_pdf_bytes(wines, leaderboard, carafe_details, wine_stats, stat
             pdf.cell(26, 7, _pdf_safe_text(avg_str), border=1, align="C")
             pdf.cell(26, 7, _pdf_safe_text(f"{ws['weight']} pts"), border=1, align="C")
             pdf.ln()
-        pdf.ln(5)
-
-        pdf.set_text_color(76, 5, 25)
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, _pdf_safe_text("4. Détail des pronostics par carafe"), ln=True)
-
-        for item in carafe_details:
-            w = item['actual_wine']
-            title = f"Carafe N°{item['carafe_number']} : {w['name']}" + (f" ({w['year']})" if w['year'] else "")
-            pdf.set_fill_color(45, 45, 45)
-            pdf.set_text_color(255, 255, 255)
-            pdf.set_font("Helvetica", "B", 9)
-            pdf.cell(0, 7, _pdf_safe_text(f"  {title}  -  Poids : {item['weight']} pts"), ln=True, fill=True)
-
-            pdf.set_text_color(30, 30, 30)
-            pdf.set_font("Helvetica", "", 9)
-            for g in item['guesses']:
-                guess_label = g['guessed_name'] + (f" ({g['guessed_year']})" if g['guessed_year'] else "")
-                status_label = "Juste" if g['status'] == 'correct' else ("Faux" if g['status'] == 'wrong' else "Sans vote")
-                pdf.cell(45, 6, _pdf_safe_text(g['username']), border=1)
-                pdf.cell(115, 6, _pdf_safe_text(guess_label[:65]), border=1)
-                pdf.cell(30, 6, _pdf_safe_text(status_label), border=1, align="C")
-                pdf.ln()
-            pdf.ln(2)
 
         raw = pdf.output()
         return bytes(raw) if isinstance(raw, (bytes, bytearray)) else raw.encode("latin-1")
@@ -510,20 +514,12 @@ def build_results_pdf_bytes(wines, leaderboard, carafe_details, wine_stats, stat
     lines.append("VERITE SUR LES CARAFES :")
     for ws in wine_stats:
         lines.append(f"  Carafe N°{ws['carafe_number']} -> {ws['name']} ({ws['correct_count']}/{ws['total_players']}, poids {ws['weight']} pts)")
-    lines.append("")
-    lines.append("DETAIL PAR CARAFE :")
-    for item in carafe_details:
-        lines.append(f"  [Carafe N°{item['carafe_number']} - {item['actual_wine']['name']}]")
-        for g in item['guesses']:
-            st = "JUSTE" if g['status'] == 'correct' else ("FAUX" if g['status'] == 'wrong' else "SANS VOTE")
-            lines.append(f"    - {g['username']} : {g['guessed_name']} [{st}]")
 
     def _esc(s):
         return _pdf_safe_text(s).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
     pages_lines = [lines[i:i + 48] for i in range(0, len(lines), 48)] or [["Aucun resultat"]]
-    objects = []
-    objects.append(b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n")
+    objects = [b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n"]
     page_ids = []
     next_id = 4
     page_objs = []
@@ -907,9 +903,16 @@ def api_save_vote():
     if not wine_id:
         return jsonify({'status': 'error', 'message': 'wine_id manquant'}), 400
 
-    wine_id = int(wine_id)
     db = get_db()
+    state = db.execute('SELECT phase FROM game_state WHERE id = 1').fetchone()
+    if not state or state['phase'] != 'VOTING':
+        return jsonify({'status': 'error', 'message': 'Phase de vote fermée'}), 400
 
+    user_row = db.execute('SELECT votes_submitted FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+    if user_row and user_row['votes_submitted']:
+        return jsonify({'status': 'locked'}), 200
+
+    wine_id = int(wine_id)
     db.execute('DELETE FROM votes WHERE user_id = ? AND guessed_wine_id = ?', (session['user_id'], wine_id))
     if carafe:
         carafe_num = int(carafe)
@@ -1008,18 +1011,15 @@ def admin():
 
         if action == 'add_wine':
             current_phase = db.execute('SELECT phase FROM game_state WHERE id = 1').fetchone()['phase']
-            if current_phase in ('VOTING', 'RESULTS'):
-                flash("Impossible d'ajouter une bouteille : les votes ont déjà commencé.", "error")
+            wines_now = db.execute('SELECT * FROM wines').fetchall()
+            if current_phase in ('BLIND_STEP1', 'BLIND_STEP2', 'VOTING', 'RESULTS') or are_wines_in_carafes(wines_now):
+                flash("Impossible d'ajouter une bouteille : la mise en carafe a déjà commencé.", "error")
             else:
                 name = (request.form.get('name') or '').strip()
                 year = (request.form.get('year') or '').strip()
                 region = (request.form.get('region') or '').strip()
-                file = request.files.get('photo')
-                image_path = None
-                if file and file.filename:
-                    filename = secure_filename(f"{random.randint(1000,9999)}_{file.filename}")
-                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                    image_path = f"uploads/{filename}"
+                uploaded_file = _extract_photo_from_request()
+                image_path = _save_uploaded_wine_photo(uploaded_file)
                 if name:
                     db.execute(
                         'INSERT INTO wines (name, year, region, image_path) VALUES (?, ?, ?, ?)',
@@ -1027,6 +1027,7 @@ def admin():
                     )
                     db.commit()
                     flash("Bouteille ajoutée à la dégustation !", "success")
+
         elif action == 'edit_wine':
             current_phase = db.execute('SELECT phase FROM game_state WHERE id = 1').fetchone()['phase']
             if current_phase in ('VOTING', 'RESULTS'):
@@ -1041,29 +1042,18 @@ def admin():
                     year = (request.form.get('year') or '').strip()
                     region = (request.form.get('region') or '').strip()
                     remove_photo = bool(request.form.get('remove_photo'))
-                    file = request.files.get('photo')
+                    uploaded_file = _extract_photo_from_request()
 
                     if not name:
                         flash("Le nom du vin est obligatoire.", "error")
                     else:
                         image_path = wine_row['image_path']
-
-                        def _delete_old_photo(rel_path):
-                            if rel_path:
-                                full_path = os.path.join(app.static_folder, rel_path)
-                                if os.path.isfile(full_path):
-                                    try:
-                                        os.remove(full_path)
-                                    except OSError:
-                                        pass
-
-                        if file and file.filename:
-                            filename = secure_filename(f"{random.randint(1000,9999)}_{file.filename}")
-                            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                            _delete_old_photo(image_path)
-                            image_path = f"uploads/{filename}"
+                        new_image_path = _save_uploaded_wine_photo(uploaded_file)
+                        if new_image_path:
+                            _delete_photo_file(image_path)
+                            image_path = new_image_path
                         elif remove_photo:
-                            _delete_old_photo(image_path)
+                            _delete_photo_file(image_path)
                             image_path = None
 
                         db.execute(
@@ -1075,6 +1065,9 @@ def admin():
 
         elif action == 'delete_wine':
             wine_id = request.form.get('wine_id')
+            wine_row = db.execute('SELECT image_path FROM wines WHERE id = ?', (wine_id,)).fetchone()
+            if wine_row:
+                _delete_photo_file(wine_row['image_path'])
             db.execute('DELETE FROM wines WHERE id = ?', (wine_id,))
             db.execute('DELETE FROM notes WHERE wine_id = ?', (wine_id,))
             db.execute('DELETE FROM votes WHERE guessed_wine_id = ?', (wine_id,))
@@ -1129,7 +1122,7 @@ def admin():
                 flash("Assignez deux joueurs distincts (Personne A et Personne B) avant de lancer l'Étape 1.", "error")
             else:
                 codes = random.sample(
-                    [f"{''.join(random.choices(string.ascii_uppercase, k=3))}" for _ in range(max(100, len(wines) * 10))],
+                    [''.join(random.choices(string.ascii_uppercase, k=3)) for _ in range(max(100, len(wines) * 10))],
                     len(wines)
                 )
                 for w, code in zip(wines, codes):
@@ -1159,6 +1152,30 @@ def admin():
                 db.execute("UPDATE game_state SET phase = 'VOTING' WHERE id = 1")
                 db.commit()
                 flash("Retour en mode vote (phase VOTING) activé.", "success")
+
+        elif action == 'step_back_phase':
+            current_phase = db.execute('SELECT phase FROM game_state WHERE id = 1').fetchone()['phase']
+            if current_phase == 'RESULTS':
+                db.execute("UPDATE game_state SET phase = 'VOTING' WHERE id = 1")
+                db.commit()
+                flash("Retour en phase de vote (VOTING).", "success")
+            elif current_phase == 'VOTING':
+                db.execute("UPDATE users SET votes_submitted = 0")
+                db.execute("UPDATE game_state SET phase = 'BLIND_STEP2' WHERE id = 1")
+                db.commit()
+                flash("Retour à l'Étape 2 de mise en carafe (BLIND_STEP2).", "success")
+            elif current_phase == 'BLIND_STEP2':
+                db.execute("UPDATE wines SET carafe_number = NULL")
+                db.execute("UPDATE game_state SET phase = 'BLIND_STEP1' WHERE id = 1")
+                db.commit()
+                flash("Retour à l'Étape 1 de mise en carafe (BLIND_STEP1).", "success")
+            elif current_phase == 'BLIND_STEP1':
+                db.execute("UPDATE wines SET temp_code = NULL, carafe_number = NULL")
+                db.execute("UPDATE game_state SET phase = 'TASTING' WHERE id = 1")
+                db.commit()
+                flash("Retour à la phase de dégustation (TASTING).", "success")
+            else:
+                flash("Vous êtes déjà à la première étape (TASTING).", "error")
 
         elif action == 'unvalidate_user_votes':
             target_user_id = request.form.get('user_id')
@@ -1222,12 +1239,32 @@ def admin():
     users = db.execute('SELECT * FROM users ORDER BY username').fetchall()
     users_map = {u['id']: u['username'] for u in users}
 
-    can_add_wine = state['phase'] not in ('VOTING', 'RESULTS')
+    carafes_ready = are_wines_in_carafes(wines)
+    carafing_started = (
+        state['phase'] in ('BLIND_STEP1', 'BLIND_STEP2', 'VOTING', 'RESULTS')
+        or carafes_ready
+    )
+    carafing_completed = (
+        carafes_ready
+        or state['phase'] in ('VOTING', 'RESULTS')
+    )
+
+    can_add_wine = not carafing_started
+    can_edit_wine = state['phase'] not in ('VOTING', 'RESULTS')
+    can_step_back = state['phase'] in ('BLIND_STEP1', 'BLIND_STEP2', 'VOTING', 'RESULTS')
+
+    prev_phase_labels = {
+        'RESULTS': 'Mode vote (VOTING)',
+        'VOTING': 'Mise en carafe - Étape 2',
+        'BLIND_STEP2': 'Mise en carafe - Étape 1',
+        'BLIND_STEP1': 'Dégustation (TASTING)'
+    }
+    prev_phase_label = prev_phase_labels.get(state['phase'])
+
     has_enough_wines = len(wines) >= 2
     roles_ready = bool(
         state['person_a_id'] and state['person_b_id'] and state['person_a_id'] != state['person_b_id']
     )
-    carafes_ready = are_wines_in_carafes(wines)
 
     can_start_step1 = has_enough_wines and roles_ready
     can_force_step2 = has_enough_wines
@@ -1283,6 +1320,10 @@ def admin():
         users_map=users_map,
         progress=progress,
         can_add_wine=can_add_wine,
+        can_edit_wine=can_edit_wine,
+        carafing_completed=carafing_completed,
+        can_step_back=can_step_back,
+        prev_phase_label=prev_phase_label,
         carafes_ready=carafes_ready,
         can_start_step1=can_start_step1,
         can_force_step2=can_force_step2,
