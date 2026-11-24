@@ -1,5 +1,4 @@
 /static/uploads
-/.venv
-*.db
+*/__pycache__
 /__pycache__
-/routes/__pycache__
+*.db
