@@ -1,0 +1,14 @@
+name: Test Self-Hosted Runner
+on:
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: self-hosted
+    steps:
+      - name: Vérifier la machine et les outils
+        shell: powershell
+        run: |
+          hostname
+          whoami
+          git --version
