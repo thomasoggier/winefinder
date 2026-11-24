@@ -1,190 +1,68 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="mb-6 flex items-center justify-between gap-2 flex-wrap">
+<div class="mb-5 flex items-center justify-between gap-2 flex-wrap">
   <div>
-    <h1 class="text-2xl font-bold text-rose-950">🏆 Résultats de la dégustation</h1>
+    <h1 class="text-2xl font-bold text-rose-950">🏆 Résultats</h1>
     <p class="text-xs text-stone-500">
-      {% if top_3_hidden %}
-      Mode suspense actif : les 3 premières places sont masquées.
-      {% else %}
-      Classement complet et vérité sur les carafes.
-      {% endif %}
+      {{ stats['total_players'] }} joueur(s) • {{ stats['total_wines'] }} carafe(s) • Réussite globale : <b>{{
+        stats['global_success_rate'] }}%</b>
     </p>
   </div>
-  {% if results_reveal == 'all' %}
-  <a href="{{ url_for('export_results_pdf') }}"
+  {% if not top_3_hidden %}
+  <a href="{{ url_for('game.export_results_pdf') }}"
     class="bg-rose-950 hover:bg-rose-900 text-white text-xs font-extrabold px-3.5 py-2.5 rounded-xl shadow-sm transition">
-    📄 Exporter PDF
+    📄 Export PDF
   </a>
   {% endif %}
 </div>
 
+{% if top_3_hidden %}
+<div class="bg-amber-50 border border-amber-200 text-amber-950 p-3.5 rounded-2xl mb-5 text-xs font-semibold">
+  🎭 Suspense activé : le Top 3 est temporairement masqué par l'administrateur.
+</div>
+{% endif %}
+
 {% if my_position %}
-<div class="bg-white border-2 border-rose-900/20 rounded-2xl p-4 shadow-sm mb-6">
-  <div class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">Votre position</div>
-  <div class="flex items-center justify-between gap-3 flex-wrap">
-    <div class="flex items-center gap-3">
+<div class="bg-white p-4 rounded-2xl shadow-sm border border-rose-900/20 mb-5 flex items-center justify-between gap-3">
+  <div>
+    <div class="text-xs text-stone-500 font-semibold">Votre classement</div>
+    <div class="text-lg font-extrabold text-rose-950">
       {% if my_position['is_hidden_podium'] %}
-      <span class="text-3xl leading-none">🔒</span>
-      <span class="text-2xl font-black text-stone-500">Top 3</span>
-      {% elif my_position['rank'] == 1 %}
-      <span class="text-4xl leading-none">🥇</span>
-      <span class="text-3xl font-black text-amber-500">1er</span>
-      {% elif my_position['rank'] == 2 %}
-      <span class="text-4xl leading-none">🥈</span>
-      <span class="text-3xl font-black text-stone-600">2e</span>
-      {% elif my_position['rank'] == 3 %}
-      <span class="text-4xl leading-none">🥉</span>
-      <span class="text-3xl font-black text-amber-800">3e</span>
+      Dans le Top 3 (secret)
       {% else %}
-      <span class="text-2xl font-black text-rose-950 bg-stone-100 px-3 py-1 rounded-xl">#{{ my_position['rank']
-        }}</span>
-      <span class="text-xs font-bold text-stone-400">/ {{ my_position['total_players'] }}</span>
+      {{ '1er' if my_position['rank'] == 1 else my_position['rank'] ~ 'e' }} / {{ my_position['total_players'] }}
       {% endif %}
-      <span class="text-sm font-bold text-stone-700">{{ my_position['username'] }}</span>
     </div>
-    <div class="text-sm font-bold text-stone-800">
-      {{ my_position['score'] }}/{{ my_position['total'] }} trouvés
-      <span class="text-rose-900">({{ my_position['weighted_score'] }} pts)</span>
-    </div>
+  </div>
+  <div class="text-right text-xs">
+    <div class="font-extrabold text-stone-800">{{ my_position['score'] }} / {{ my_position['total'] }} trouvés</div>
+    <div class="text-rose-900 font-bold">{{ my_position['weighted_score'] }} pts pondérés</div>
   </div>
 </div>
 {% endif %}
 
-<!-- Statistiques globales -->
-<div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-  <div class="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-sm">
-    <div class="text-[11px] font-bold uppercase text-stone-400">Réussite globale</div>
-    <div class="text-xl font-extrabold text-rose-950 mt-0.5">{{ stats['global_success_rate'] }}%</div>
-    <div class="text-[11px] text-stone-500">{{ stats['total_correct_votes'] }} / {{ stats['total_possible_votes'] }}
-    </div>
-  </div>
-  {% if stats['easiest_wine'] %}
-  <div class="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-sm">
-    <div class="text-[11px] font-bold uppercase text-stone-400">Plus reconnu</div>
-    <div class="text-sm font-extrabold text-emerald-800 mt-0.5 truncate">{{ stats['easiest_wine']['name'] }}</div>
-    <div class="text-[11px] text-stone-500">Carafe N°{{ stats['easiest_wine']['carafe_number'] }} ({{
-      stats['easiest_wine']['correct_count'] }}/{{ stats['easiest_wine']['total_players'] }})</div>
-  </div>
-  {% endif %}
-  {% if stats['hardest_wine'] %}
-  <div class="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-sm col-span-2 sm:col-span-1">
-    <div class="text-[11px] font-bold uppercase text-stone-400">Plus piégeux</div>
-    <div class="text-sm font-extrabold text-amber-800 mt-0.5 truncate">{{ stats['hardest_wine']['name'] }}</div>
-    <div class="text-[11px] text-stone-500">Carafe N°{{ stats['hardest_wine']['carafe_number'] }} ({{
-      stats['hardest_wine']['correct_count'] }}/{{ stats['hardest_wine']['total_players'] }})</div>
-  </div>
-  {% endif %}
-</div>
-
-<!-- Statistiques amusantes -->
-{% set fun = stats.get('fun_stats', {}) %}
-<div class="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm mb-6">
-  <h2 class="font-bold text-base text-rose-950 mb-3">🎲 Statistiques amusantes</h2>
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-    <div class="p-3 rounded-xl bg-amber-50/70 border border-amber-200">
-      <div class="font-extrabold text-amber-950 mb-0.5">🃏 Coup de poker</div>
-      {% if fun.get('poker_winner') %}
-      <p class="text-stone-700">
-        <span class="font-bold">{{ fun['poker_winner']['username'] }}</span> a déniché
-        <span class="font-bold">{{ fun['poker_winner']['best_single_wine_name'] }}</span>
-        (carafe cotée à <span class="font-bold text-amber-900">{{ fun['poker_winner']['best_single_weight'] }}
-          pts</span>).
-      </p>
-      {% else %}
-      <p class="text-stone-400 italic">Aucune carafe rare trouvée.</p>
-      {% endif %}
-    </div>
-
-    <div class="p-3 rounded-xl bg-rose-50/60 border border-rose-200">
-      <div class="font-extrabold text-rose-950 mb-0.5">🎭 Coup de cœur piège</div>
-      {% if fun.get('surprise_trap') %}
-      <p class="text-stone-700">
-        <span class="font-bold">{{ fun['surprise_trap']['name'] }}</span> affiche une moyenne de
-        <span class="font-bold">{{ fun['surprise_trap']['avg_rating'] }}/10</span> pour
-        <span class="font-bold">{{ fun['surprise_trap']['success_rate'] }}%</span> de réussite à l'aveugle.
-      </p>
-      {% else %}
-      <p class="text-stone-400 italic">Pas assez de notes pour calculer.</p>
-      {% endif %}
-    </div>
-
-    <div class="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200">
-      <div class="font-extrabold text-emerald-950 mb-0.5">❤️ Le plus généreux</div>
-      {% if fun.get('most_generous') %}
-      <p class="text-stone-700">
-        <span class="font-bold">{{ fun['most_generous']['username'] }}</span> avec une moyenne de
-        <span class="font-bold text-emerald-800">{{ fun['most_generous']['avg_given_rating'] }}/10</span>.
-      </p>
-      {% else %}
-      <p class="text-stone-400 italic">Aucune note enregistrée.</p>
-      {% endif %}
-    </div>
-
-    <div class="p-3 rounded-xl bg-stone-50 border border-stone-200">
-      <div class="font-extrabold text-stone-800 mb-0.5">🧐 Le plus sévère</div>
-      {% if fun.get('most_strict') %}
-      <p class="text-stone-700">
-        <span class="font-bold">{{ fun['most_strict']['username'] }}</span> avec une moyenne de
-        <span class="font-bold text-stone-900">{{ fun['most_strict']['avg_given_rating'] }}/10</span>.
-      </p>
-      {% else %}
-      <p class="text-stone-400 italic">Aucune note enregistrée.</p>
-      {% endif %}
-    </div>
-  </div>
-</div>
-
 <!-- Classement -->
-<div class="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm mb-6">
+<div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6">
   <h2 class="font-bold text-base text-rose-950 mb-3">🥇 Classement des nez</h2>
-  <div class="space-y-2.5">
+  <div class="space-y-2">
     {% for p in leaderboard %}
     <div
-      class="flex items-center justify-between gap-3 p-3.5 rounded-xl border {{ 'bg-amber-50/50 border-amber-300' if (not p['is_hidden_podium'] and p['rank'] == 1) else ('bg-rose-50/70 border-rose-200' if p['is_me'] else 'bg-stone-50 border-stone-100') }}">
-      <div class="flex items-center gap-3 min-w-0">
-        {% if p['is_hidden_podium'] %}
-        <div class="flex items-center gap-1.5 shrink-0 bg-stone-200/80 text-stone-500 px-3 py-1.5 rounded-xl">
-          <span class="text-2xl leading-none">🔒</span>
-          <span class="text-xl font-black leading-none">?</span>
-        </div>
-        {% elif p['rank'] == 1 %}
-        <div class="flex items-center gap-1.5 shrink-0 bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-xl">
-          <span class="text-3xl leading-none">🥇</span>
-          <span class="text-2xl font-black text-amber-900 leading-none">1er</span>
-        </div>
-        {% elif p['rank'] == 2 %}
-        <div class="flex items-center gap-1.5 shrink-0 bg-stone-200/90 border border-stone-300 px-3 py-1.5 rounded-xl">
-          <span class="text-3xl leading-none">🥈</span>
-          <span class="text-2xl font-black text-stone-800 leading-none">2e</span>
-        </div>
-        {% elif p['rank'] == 3 %}
-        <div
-          class="flex items-center gap-1.5 shrink-0 bg-orange-100/80 border border-orange-300 px-3 py-1.5 rounded-xl">
-          <span class="text-3xl leading-none">🥉</span>
-          <span class="text-2xl font-black text-orange-950 leading-none">3e</span>
-        </div>
-        {% else %}
-        <div
-          class="flex items-center justify-center shrink-0 bg-stone-200/70 text-stone-700 px-3 py-1.5 rounded-xl min-w-[3.5rem]">
-          <span class="text-xl font-black leading-none">{{ p['rank'] }}e</span>
-        </div>
-        {% endif %}
-
-        <div class="truncate">
-          {% if p['is_hidden_podium'] %}
-          <span class="font-bold text-stone-400 italic">Participant du Top 3 (masqué)</span>
-          {% else %}
-          <span class="font-extrabold text-base text-stone-900">{{ p['username'] }}</span>
-          {% endif %}
-        </div>
+      class="flex items-center justify-between gap-2 p-3 rounded-xl {{ 'bg-rose-50/70 border border-rose-200' if p['is_me'] else 'bg-stone-50 border border-stone-100' }}">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span class="w-7 text-center font-extrabold text-sm text-rose-950">
+          {% if p['is_hidden_podium'] %}?{% else %}{{ '🥇' if p['rank'] == 1 else ('🥈' if p['rank'] == 2 else ('🥉' if
+          p['rank'] == 3 else '#' ~ p['rank'])) }}{% endif %}
+        </span>
+        <span class="font-bold text-sm text-stone-800 truncate">
+          {{ 'Joueur du Top 3' if p['is_hidden_podium'] else p['username'] }}
+        </span>
       </div>
-      <div class="text-right shrink-0">
+      <div class="text-right text-xs shrink-0">
         {% if p['is_hidden_podium'] %}
-        <span class="text-xs font-bold text-stone-400">Secret</span>
+        <span class="italic text-stone-400">Masqué</span>
         {% else %}
-        <div class="text-sm font-extrabold text-rose-950">{{ p['score'] }}/{{ p['total'] }}</div>
-        <div class="text-[11px] font-semibold text-stone-500">{{ p['weighted_score'] }} pts</div>
+        <span class="font-extrabold text-stone-900">{{ p['score'] }}/{{ p['total'] }}</span>
+        <span class="text-rose-900 font-bold ml-1.5">({{ p['weighted_score'] }} pts)</span>
         {% endif %}
       </div>
     </div>
@@ -193,72 +71,74 @@
 </div>
 
 <!-- Vérité sur les carafes -->
-<div class="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm mb-6">
-  <h2 class="font-bold text-base text-rose-950 mb-3">🫙 La vérité sur les carafes</h2>
-  <div class="space-y-2.5">
-    {% for item in carafe_details %}
-    {% set w = item['actual_wine'] %}
-    <div class="p-3.5 rounded-xl bg-stone-50 border border-stone-200 flex items-center justify-between gap-3 flex-wrap">
+<div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 mb-6 space-y-3">
+  <h2 class="font-bold text-base text-rose-950">🫙 La vérité sur les carafes</h2>
+  {% for c in carafe_details %}
+  {% set w = c['actual_wine'] %}
+  <div class="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-2">
+    <div class="flex items-center justify-between gap-3">
       <div class="flex items-center gap-3 min-w-0">
         {% if w['image_path'] %}
         <img src="{{ url_for('static', filename=w['image_path']) }}" alt="{{ w['name'] }}"
-          class="w-14 h-14 rounded-xl object-cover bg-stone-900 border border-stone-200 shrink-0">
-        {% else %}
-        <div
-          class="w-14 h-14 rounded-xl bg-rose-950/10 text-rose-950 flex items-center justify-center text-2xl shrink-0">
-          🍷
-        </div>
+          class="w-11 h-11 rounded-lg object-cover bg-stone-900 shrink-0">
         {% endif %}
         <div class="min-w-0">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="bg-rose-950 text-white text-xs font-extrabold px-2.5 py-0.5 rounded-lg shrink-0">
-              Carafe N°{{ item['carafe_number'] }}
-            </span>
-            <span class="font-extrabold text-sm text-rose-950 truncate">{{ w['name'] }}</span>
-          </div>
-          {% if w['year'] or w['region'] %}
-          <div class="text-xs text-stone-500 mt-0.5 truncate">
-            {{ w['region'] or '' }}{{ ' • ' if w['region'] and w['year'] }}{{ w['year'] or '' }}
-          </div>
-          {% endif %}
+          <div class="text-xs font-extrabold text-rose-900">Carafe N°{{ c['carafe_number'] }} • Poids {{ c['weight'] }}
+            pts</div>
+          <div class="font-bold text-sm text-stone-900 truncate">{{ w['name'] }} {{ '(' ~ w['year'] ~ ')' if w['year']
+            }}</div>
         </div>
       </div>
-      <div class="text-xs font-bold text-stone-600 shrink-0">
-        {{ item['correct_count'] }}/{{ item['total_players'] }} ({{ item['success_rate'] }}%) • <span
-          class="text-amber-800">{{ item['weight'] }} pts</span>
+      <div class="text-xs font-bold text-stone-700 shrink-0">
+        {{ c['correct_count'] }}/{{ c['total_players'] }} ({{ c['success_rate'] }}%)
       </div>
     </div>
-    {% endfor %}
+    <div class="flex flex-wrap gap-1.5 text-[11px]">
+      {% for g in c['guesses'] %}
+      <span
+        class="px-2 py-0.5 rounded-full font-semibold {{ 'bg-emerald-100 text-emerald-900' if g['status'] == 'correct' else ('bg-red-100 text-red-800' if g['status'] == 'wrong' else 'bg-stone-200 text-stone-600') }}">
+        {{ g['username'] }} : {{ g['guessed_name'] }}
+      </span>
+      {% endfor %}
+    </div>
   </div>
+  {% endfor %}
 </div>
 
-<!-- Mes notes vs réalité -->
-<div class="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm">
-  <h2 class="font-bold text-base text-rose-950 mb-3">📝 Mes notes & pronostics</h2>
-  <div class="space-y-2.5 text-xs">
-    {% for rev in my_notes_review %}
-    {% set w = rev['wine'] %}
-    {% set n = rev['note'] %}
-    <div
-      class="p-3 rounded-xl border {{ 'border-emerald-200 bg-emerald-50/40' if rev['found_it'] else 'border-stone-200 bg-stone-50' }}">
-      <div class="flex items-center justify-between gap-2 flex-wrap">
-        <span class="font-bold text-sm text-rose-950">{{ w['name'] }}</span>
-        <span class="font-bold {{ 'text-emerald-700' if rev['found_it'] else 'text-stone-600' }}">
-          {{ '✓ Trouvé (Carafe N°' ~ w['carafe_number'] ~ ')' if rev['found_it'] else ('Votre choix : Carafe N°' ~
-          rev['guessed_carafe'] ~ ' (Réalité : N°' ~ w['carafe_number'] ~ ')' if rev['guessed_carafe'] else 'Non voté
-          (Réalité : N°' ~ w['carafe_number'] ~ ')') }}
-        </span>
-      </div>
-      {% if n %}
-      <p class="text-stone-600 mt-1">
-        Note : <b>{{ n.get('rating', '-') }}/10</b>
-        {% if n.get('nose') %} • Nez : {{ n.get('nose') }}{% endif %}
-        {% if n.get('palate') %} • Bouche : {{ n.get('palate') }}{% endif %}
-        {% if n.get('free_notes') %} • {{ n.get('free_notes') }}{% endif %}
-      </p>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
+<div id="results-poll-banner" class="mt-4 text-center text-[11px] text-stone-500">
+  Vérification automatique de l'affichage des résultats toutes les 4s…
 </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var statusUrl = "{{ url_for('game.api_game_status') }}";
+    var indexUrl = "{{ url_for('game.index') }}";
+    var initialPhase = "RESULTS";
+    var initialReveal = "{{ results_reveal or 'all' }}";
+
+    setInterval(function () {
+      if (document.hidden) {
+        return;
+      }
+
+      fetch(statusUrl, { cache: "no-store" })
+        .then(function (r) {
+          return r.ok ? r.json() : null;
+        })
+        .then(function (data) {
+          if (!data) {
+            return;
+          }
+          if (data.phase !== initialPhase) {
+            window.location.href = indexUrl;
+            return;
+          }
+          if (data.results_reveal !== initialReveal) {
+            window.location.reload();
+          }
+        })
+        .catch(function () { });
+    }, 4000);
+  });
+</script>
 {% endblock %}

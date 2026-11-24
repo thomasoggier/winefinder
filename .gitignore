@@ -1,0 +1,5 @@
+/static/uploads
+/.venv
+*.db
+/__pycache__
+/routes/__pycache__
