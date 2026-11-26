@@ -35,6 +35,6 @@ jobs:
           docker run -d `
             --name winefinder `
             --restart unless-stopped `
-            -p 5050:5000 `
+            -p 5050:5050 `
             -v winefinder_data:/app/data `
             winefinder:latest
