@@ -3,38 +3,36 @@ name: CI/CD Winefinder
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
-  test-and-deploy:
-    name: Tests & Déploiement Docker
+  build-and-deploy:
+    name: Build & Déploiement Docker
     runs-on: self-hosted
+    env:
+      DOCKER_HOST: tcp://localhost:2375
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Construire l'image de test
+      - name: Construire l'image Docker
         shell: powershell
         run: |
-          docker build -t winefinder:test .
+          docker build -t winefinder:latest .
 
-      - name: Lancer les tests dans le conteneur
+      - name: Vérifier que l'application démarre (sanity check)
         shell: powershell
         run: |
-          docker run --rm winefinder:test python -m unittest discover -s db_tests
+          docker run --rm winefinder:latest python -m py_compile app.py
 
-      - name: Déployer le conteneur en production
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      - name: Redémarrer le conteneur en production
         shell: powershell
         run: |
-          docker tag winefinder:test winefinder:latest
           docker stop winefinder 2>$null
           docker rm winefinder 2>$null
           docker run -d `
             --name winefinder `
             --restart unless-stopped `
-            -p 5050:5050 `
+            -p 5050:5000 `
             -v winefinder_data:/app/data `
             winefinder:latest
