@@ -8,53 +8,33 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    name: Tests Python
+  test-and-deploy:
+    name: Tests & Déploiement Docker
     runs-on: self-hosted
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Créer l'environnement virtuel et installer les dépendances
+      - name: Construire l'image de test
         shell: powershell
         run: |
-          if (!(Test-Path ".venv")) {
-            python -m venv .venv
-          }
-          .\.venv\Scripts\Activate.ps1
-          python -m pip install --upgrade pip
-          if (Test-Path "requirements.txt") {
-            pip install -r requirements.txt
-          }
+          docker build -t winefinder:test .
 
-      - name: Lancer les tests (db_tests)
+      - name: Lancer les tests dans le conteneur
         shell: powershell
         run: |
-          .\.venv\Scripts\Activate.ps1
-          if (Get-Command pytest -ErrorAction SilentlyContinue) {
-            pytest db_tests
-          } else {
-            python -m unittest discover -s db_tests
-          }
+          docker run --rm winefinder:test python -m unittest discover -s db_tests
 
-  deploy:
-    name: Build & Redémarrage Docker
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: self-hosted
-    steps:
-      - name: Récupérer le code
-        uses: actions/checkout@v4
-
-      - name: Construire l'image et relancer le conteneur
+      - name: Déployer le conteneur en production
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         shell: powershell
         run: |
-          docker build -t winefinder:latest .
+          docker tag winefinder:test winefinder:latest
           docker stop winefinder 2>$null
           docker rm winefinder 2>$null
           docker run -d `
             --name winefinder `
             --restart unless-stopped `
-            -p 5050:5050 `
+            -p 5050:5000 `
             -v winefinder_data:/app/data `
             winefinder:latest
