@@ -349,3 +349,28 @@ def admin():
         can_export_pdf=can_export_pdf,
         archived_dbs=archived_dbs
     )
+
+@admin_bp.route('/admin/db')
+@login_required
+@admin_required
+def admin_db():
+    db = get_db()
+    table_rows = db.execute(
+        "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    ).fetchall()
+
+    tables = []
+    for t in table_rows:
+        name = t['name']
+        rows = db.execute(f'SELECT * FROM "{name}"').fetchall()
+        cols = list(rows[0].keys()) if rows else [
+            c['name'] for c in db.execute(f'PRAGMA table_info("{name}")').fetchall()
+        ]
+        tables.append({
+            'name': name,
+            'sql': t['sql'],
+            'cols': cols,
+            'rows': rows,
+        })
+
+    return render_template('admin_db.html', tables=tables)
