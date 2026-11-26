@@ -6,7 +6,6 @@ on:
   workflow_dispatch:
 
 jobs:
-jobs:
   build-and-deploy:
     name: Build & Déploiement Docker
     runs-on: self-hosted
