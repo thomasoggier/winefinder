@@ -1,0 +1,60 @@
+name: CI/CD Winefinder
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Tests Python
+    runs-on: self-hosted
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Créer l'environnement virtuel et installer les dépendances
+        shell: powershell
+        run: |
+          if (!(Test-Path ".venv")) {
+            python -m venv .venv
+          }
+          .\.venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          if (Test-Path "requirements.txt") {
+            pip install -r requirements.txt
+          }
+
+      - name: Lancer les tests (db_tests)
+        shell: powershell
+        run: |
+          .\.venv\Scripts\Activate.ps1
+          if (Get-Command pytest -ErrorAction SilentlyContinue) {
+            pytest db_tests
+          } else {
+            python -m unittest discover -s db_tests
+          }
+
+  deploy:
+    name: Build & Redémarrage Docker
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: self-hosted
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Construire l'image et relancer le conteneur
+        shell: powershell
+        run: |
+          docker build -t winefinder:latest .
+          docker stop winefinder 2>$null
+          docker rm winefinder 2>$null
+          docker run -d `
+            --name winefinder `
+            --restart unless-stopped `
+            -p 5050:5050 `
+            -v winefinder_data:/app/data `
+            winefinder:latest
